@@ -1,6 +1,7 @@
 // ===== DASHBOARD.JS =====
 import { auth, db } from './firebase.js';
 import { doc, getDoc, setDoc, updateDoc, collection, query, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js';
 
 // DOM Elements
 const userNameElement = document.getElementById('user-name');
@@ -44,12 +45,24 @@ let attendanceData = {};
 
 // Initialize dashboard
 function initDashboard() {
+    // If there's no local loggedInUser and no Firebase user, redirect to login
     if (!auth.currentUser && !localStorage.getItem('loggedInUser')) {
         window.location.href = 'login.html';
         return;
     }
-    updateUserInfo(auth.currentUser);
-    loadUserData();
+
+    // Wait for Firebase auth to be ready and then initialize user-specific data
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            updateUserInfo(user);
+            loadUserData();
+        } else {
+            // If user is not present but local flag exists, show loading until sync
+            if (localStorage.getItem('loggedInUser')) {
+                showLoading();
+            }
+        }
+    });
     setupNavigation();
     setupCalendar();
     setupModal();
@@ -177,6 +190,7 @@ function renderCalendar() {
     // Generate calendar days
     const currentDateIter = new Date(startDate);
     let dayCount = 0;
+    const todayKey = formatDate(new Date());
     while (currentDateIter <= lastDay || dayCount < 42) { // Ensure we fill the grid
         const dayElement = document.createElement('div');
         dayElement.className = 'day-cell';
@@ -190,6 +204,7 @@ function renderCalendar() {
         } else {
             const attendance = attendanceData[dateKey];
             if (attendance) {
+                console.debug('renderCalendar:', dateKey, 'status=', attendance.status);
                 if (attendance.status === 'present') {
                     dayElement.classList.add('present');
                 } else if (attendance.status === 'bunked') {
@@ -197,7 +212,14 @@ function renderCalendar() {
                 }
             }
 
-            dayElement.addEventListener('click', () => openAttendanceModal(currentDateIter));
+            // Capture a copy of the date for the event listener to avoid closure over the mutating iterator
+            const dateCopy = new Date(currentDateIter);
+            dayElement.addEventListener('click', () => openAttendanceModal(dateCopy));
+        }
+
+        // Highlight today's date
+        if (dateKey === todayKey) {
+            dayElement.classList.add('today');
         }
 
         calendarGrid.appendChild(dayElement);
@@ -216,15 +238,25 @@ function setupModal() {
     });
 
     markPresentBtn.addEventListener('click', () => {
+        // Select present and save immediately: close modal then save in background
         bunkDetails.style.display = 'none';
         markPresentBtn.classList.add('selected');
         markBunkBtn.classList.remove('selected');
+        // Hide explicit save button since we're saving immediately for present
+        if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
+
+        // Capture the selected date, close UI immediately, then save using captured date
+        const dateToSave = selectedDate;
+        closeAttendanceModal();
+        if (dateToSave) saveAttendance(dateToSave);
     });
 
     markBunkBtn.addEventListener('click', () => {
+        // Show bunk details and require explicit save
         bunkDetails.style.display = 'block';
         markBunkBtn.classList.add('selected');
         markPresentBtn.classList.remove('selected');
+        if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
     });
 
     saveAttendanceBtn.addEventListener('click', saveAttendance);
@@ -247,12 +279,14 @@ function openAttendanceModal(date) {
             markPresentBtn.classList.add('selected');
             markBunkBtn.classList.remove('selected');
             bunkDetails.style.display = 'none';
+            if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
         } else {
             markBunkBtn.classList.add('selected');
             markPresentBtn.classList.remove('selected');
             bunkDetails.style.display = 'block';
             bunkActivityInput.value = existingAttendance.activity || '';
             bunkMissedInput.value = existingAttendance.missed || '';
+            if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
         }
     } else {
         markPresentBtn.classList.remove('selected');
@@ -260,6 +294,7 @@ function openAttendanceModal(date) {
         bunkDetails.style.display = 'none';
         bunkActivityInput.value = '';
         bunkMissedInput.value = '';
+        if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
     }
 
     attendanceModal.hidden = false;
@@ -270,47 +305,70 @@ function closeAttendanceModal() {
     selectedDate = null;
 }
 
-async function saveAttendance() {
-    if (!selectedDate || !auth.currentUser) return;
+async function saveAttendance(dateArg) {
+    const dateToUse = dateArg || selectedDate;
+    if (!dateToUse || !auth.currentUser) return;
 
-    showLoading();
-    const dateKey = formatDate(selectedDate);
-    const isPresent = markPresentBtn.classList.contains('selected');
+    const dateKey = formatDate(dateToUse);
+
+    // Determine selection state: if modal is open, use buttons; otherwise assume present when called programmatically
     const isBunked = markBunkBtn.classList.contains('selected');
+    const status = dateArg ? 'present' : (isBunked ? 'bunked' : (markPresentBtn.classList.contains('selected') ? 'present' : null));
 
     let attendanceRecord = {
-        date: selectedDate.toISOString(),
-        status: isPresent ? 'present' : isBunked ? 'bunked' : null
+        date: dateToUse.toISOString(),
+        status: status
     };
 
-    if (isBunked) {
+    if (status === 'bunked') {
         attendanceRecord.activity = bunkActivityInput.value;
         attendanceRecord.missed = bunkMissedInput.value;
     }
 
+    // Optimistically update UI immediately so user sees instant feedback
+    attendanceData[dateKey] = attendanceRecord;
+    console.debug('saveAttendance: wrote to local attendanceData', dateKey, attendanceRecord);
+    updateStats();
+    console.debug('saveAttendance: stats after update:', {
+        present: presentDaysElement ? presentDaysElement.textContent : null,
+        bunk: bunkDaysElement ? bunkDaysElement.textContent : null,
+        rate: attendanceRateElement ? attendanceRateElement.textContent : null
+    });
+    renderCalendar();
+    loadInsights();
+
+    // Don't block UI for quick present saves; show loading only for bunk or when explicitly needed
+    const shouldShowLoading = status === 'bunked';
+    if (shouldShowLoading) showLoading();
+
     try {
-        attendanceData[dateKey] = attendanceRecord;
+        // Write only the single date entry to Firestore to reduce payload and speed up writes
+        const attendanceRef = doc(db, 'users', auth.currentUser.uid);
+        try {
+            await updateDoc(attendanceRef, {
+                [`attendance.${dateKey}`]: attendanceRecord
+            });
+        } catch (e) {
+            // If update fails (e.g., document missing), fallback to setDoc merge
+            await setDoc(attendanceRef, { attendance: { [dateKey]: attendanceRecord } }, { merge: true });
+        }
 
-        await setDoc(doc(db, 'users', auth.currentUser.uid), {
-            attendance: attendanceData
-        }, { merge: true });
+        if (!shouldShowLoading) showToast('Attendance saved');
+        console.debug('saveAttendance: persisted to Firestore', dateKey);
 
-        updateStats();
-        renderCalendar();
-        loadInsights();
-        closeAttendanceModal();
-        showToast('Attendance saved successfully!');
         // Update challenges if present
-        Object.keys(challengesData).forEach(challengeId => {
-            if (challengesData[challengeId].active && isPresent) {
-                handleCheckIn(challengeId);
-            }
-        });
+        if (status === 'present') {
+            Object.keys(challengesData).forEach(challengeId => {
+                if (challengesData[challengeId].active) {
+                    handleCheckIn(challengeId);
+                }
+            });
+        }
     } catch (error) {
         console.error('Error saving attendance:', error);
         showToast('Error saving attendance. Please try again.');
     } finally {
-        hideLoading();
+        if (shouldShowLoading) hideLoading();
     }
 }
 
@@ -1144,7 +1202,11 @@ async function clearAllData() {
 
 // Utility functions
 function formatDate(date) {
-    return date.toISOString().split('T')[0];
+    // Use local date components to avoid UTC shift issues
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 }
 
 // Simple toast function (will be enhanced with js/toasts.js later)
