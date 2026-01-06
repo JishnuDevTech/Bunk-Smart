@@ -1,0 +1,36 @@
+type Student @table {
+  studentID: String!
+  name: String!
+  email: String!
+  photoUrl: String
+  major: String
+}
+
+type Course @table {
+  courseCode: String!
+  courseName: String!
+  description: String
+  instructorName: String
+}
+
+type Enrollment @table(key: ["student", "course"]) {
+  student: Student!
+  course: Course!
+  enrollmentDate: Date
+}
+
+type Session @table {
+  course: Course!
+  sessionDate: Date!
+  startTime: Timestamp!
+  endTime: Timestamp!
+  topic: String
+  location: String
+}
+
+type Attendance @table(key: ["student", "session"]) {
+  student: Student!
+  session: Session!
+  attendanceStatus: String!
+  recordedAt: Timestamp
+}

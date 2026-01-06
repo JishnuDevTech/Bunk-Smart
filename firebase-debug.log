@@ -1,0 +1,213 @@
+[debug] [2026-01-06T07:59:55.230Z] ----------------------------------------------------------------------
+[debug] [2026-01-06T07:59:55.231Z] Command:       /usr/local/share/nvm/versions/node/v24.11.1/bin/node /home/codespace/nvm/current/bin/firebase init
+[debug] [2026-01-06T07:59:55.232Z] CLI Version:   15.1.0
+[debug] [2026-01-06T07:59:55.232Z] Platform:      linux
+[debug] [2026-01-06T07:59:55.232Z] Node Version:  v24.11.1
+[debug] [2026-01-06T07:59:55.232Z] Time:          Tue Jan 06 2026 07:59:55 GMT+0000 (Coordinated Universal Time)
+[debug] [2026-01-06T07:59:55.232Z] ----------------------------------------------------------------------
+[debug] 
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  /workspaces/Bunk-Smart
+
+Before we get started, keep in mind:
+
+  * You are currently outside your home directory
+
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] 
+[debug] [2026-01-06T08:00:05.784Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-01-06T08:00:05.784Z] > authorizing via signed-in user (jishnurahegaonkar@gmail.com)
+[debug] [2026-01-06T08:00:05.786Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:00:05.786Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:00:05.787Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/bunk-smart [none]
+[debug] [2026-01-06T08:00:06.371Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/bunk-smart 200
+[debug] [2026-01-06T08:00:06.371Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/bunk-smart {"projectId":"bunk-smart","projectNumber":"442885510044","displayName":"Bunk-Smart","name":"projects/bunk-smart","resources":{"hostingSite":"bunk-smart"},"state":"ACTIVE","etag":"1_4c8782d1-64cf-4f5d-90e7-10b5b9841d83"}
+[info] i  Using project bunk-smart (Bunk-Smart) . 
+[info] 
+=== Dataconnect Setup
+[info] i  dataconnect: ensuring required API firebasedataconnect.googleapis.com is enabled... 
+[info] i  dataconnect: ensuring required API sqladmin.googleapis.com is enabled... 
+[debug] [2026-01-06T08:00:06.379Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:00:06.379Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:00:06.379Z] >>> [apiv2][query] GET https://firebasedataconnect.googleapis.com/v1/projects/bunk-smart/locations/-/services [none]
+[debug] [2026-01-06T08:00:08.295Z] <<< [apiv2][status] GET https://firebasedataconnect.googleapis.com/v1/projects/bunk-smart/locations/-/services 200
+[debug] [2026-01-06T08:00:08.295Z] <<< [apiv2][body] GET https://firebasedataconnect.googleapis.com/v1/projects/bunk-smart/locations/-/services {"services":[{"name":"projects/bunk-smart/locations/us-east4/services/bunk-smart","createTime":"2026-01-06T07:48:51.971274588Z","updateTime":"2026-01-06T07:49:55.878906116Z","uid":"a74fd516-7a8b-4d44-b6e5-39a388d68c37","reconciling":false,"etag":"Rd2FAx9y-XIpM_-ZSC4lUsis2JCSMqsGdn0N_VnI7Ms"}]}
+[debug] [2026-01-06T08:00:11.547Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:00:11.547Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:00:11.548Z] >>> [apiv2][query] GET https://firebasedataconnect.googleapis.com/v1/projects/bunk-smart/locations/us-east4/services/bunk-smart/schemas pageSize=100&pageToken=&fields=schemas.name%2Cschemas.datasources%2Cschemas.source
+[debug] [2026-01-06T08:00:13.271Z] <<< [apiv2][status] GET https://firebasedataconnect.googleapis.com/v1/projects/bunk-smart/locations/us-east4/services/bunk-smart/schemas 200
+[debug] [2026-01-06T08:00:13.271Z] <<< [apiv2][body] GET https://firebasedataconnect.googleapis.com/v1/projects/bunk-smart/locations/us-east4/services/bunk-smart/schemas {"schemas":[{"name":"projects/bunk-smart/locations/us-east4/services/bunk-smart/schemas/main","source":{"files":[{"path":"schema.gql","content":"type Student @table {\n  studentID: String!\n  name: String!\n  email: String!\n  photoUrl: String\n  major: String\n}\n\ntype Course @table {\n  courseCode: String!\n  courseName: String!\n  description: String\n  instructorName: String\n}\n\ntype Enrollment @table(key: [\"student\", \"course\"]) {\n  student: Student!\n  course: Course!\n  enrollmentDate: Date\n}\n\ntype Session @table {\n  course: Course!\n  sessionDate: Date!\n  startTime: Timestamp!\n  endTime: Timestamp!\n  topic: String\n  location: String\n}\n\ntype Attendance @table(key: [\"student\", \"session\"]) {\n  student: Student!\n  session: Session!\n  attendanceStatus: String!\n  recordedAt: Timestamp\n}"}]},"datasources":[{"postgresql":{"ephemeral":true}}]}]}
+[debug] [2026-01-06T08:00:13.272Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:00:13.272Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:00:13.272Z] >>> [apiv2][query] GET https://firebasedataconnect.googleapis.com/v1/projects/bunk-smart/locations/us-east4/services/bunk-smart/connectors pageSize=100&pageToken=&fields=connectors.name%2Cconnectors.source.files
+[debug] [2026-01-06T08:00:13.610Z] <<< [apiv2][status] GET https://firebasedataconnect.googleapis.com/v1/projects/bunk-smart/locations/us-east4/services/bunk-smart/connectors 200
+[debug] [2026-01-06T08:00:13.610Z] <<< [apiv2][body] GET https://firebasedataconnect.googleapis.com/v1/projects/bunk-smart/locations/us-east4/services/bunk-smart/connectors {}
+[debug] [2026-01-06T08:00:13.611Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:00:13.611Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:00:13.611Z] >>> [apiv2][query] GET https://cloudbilling.googleapis.com/v1/projects/bunk-smart/billingInfo [none]
+[debug] [2026-01-06T08:00:13.965Z] <<< [apiv2][status] GET https://cloudbilling.googleapis.com/v1/projects/bunk-smart/billingInfo 200
+[debug] [2026-01-06T08:00:13.966Z] <<< [apiv2][body] GET https://cloudbilling.googleapis.com/v1/projects/bunk-smart/billingInfo {"name":"projects/bunk-smart/billingInfo","projectId":"bunk-smart","billingAccountName":"","billingEnabled":false}
+[debug] [2026-01-06T08:00:13.966Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:00:13.966Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:00:13.966Z] >>> [apiv2][query] GET https://monitoring.googleapis.com/v3/projects/bunk-smart/timeSeries/ filter=metric.type%3D%22serviceruntime.googleapis.com%2Fquota%2Fallocation%2Fusage%22+AND+metric.label.quota_metric+%3D+%22sqladmin.googleapis.com%2Ffdc_lifetime_free_trial_per_project%22&interval.endTime=2026-01-06T08%3A00%3A13.966Z&interval.startTime=2025-12-30T08%3A00%3A13.966Z
+[debug] [2026-01-06T08:00:15.329Z] <<< [apiv2][status] GET https://monitoring.googleapis.com/v3/projects/bunk-smart/timeSeries/ 200
+[debug] [2026-01-06T08:00:15.329Z] <<< [apiv2][body] GET https://monitoring.googleapis.com/v3/projects/bunk-smart/timeSeries/ {"unit":"1"}
+[info] ✔  dataconnect: Detected existing apps functions (admin_node), bunksmart (admin_node) 
+[info] i  dataconnect/dataconnect.yaml is unchanged 
+[info] i  dataconnect/schema/schema.gql is unchanged 
+[info] i  dataconnect/example/connector.yaml is unchanged 
+[info] ✔  Wrote dataconnect/example/connector.yaml 
+[info] i  dataconnect: Installing the generated SDKs ... 
+[info] i  dataconnect: downloading dataconnect-emulator-3.0.1... {"metadata":{"emulator":{"name":"dataconnect"},"message":"downloading dataconnect-emulator-3.0.1..."}}
+[debug] [2026-01-06T08:00:20.222Z] >>> [apiv2][query] GET https://storage.googleapis.com/firemat-preview-drop/emulator/dataconnect-emulator-linux-amd64-v3.0.1 
+[debug] [2026-01-06T08:00:20.634Z] <<< [apiv2][status] GET https://storage.googleapis.com/firemat-preview-drop/emulator/dataconnect-emulator-linux-amd64-v3.0.1 200
+[debug] [2026-01-06T08:00:20.635Z] <<< [apiv2][body] GET https://storage.googleapis.com/firemat-preview-drop/emulator/dataconnect-emulator-linux-amd64-v3.0.1 [stream]
+[debug] [2026-01-06T08:00:24.415Z] defaultcredentials: writing to file /home/codespace/.config/firebase/jishnurahegaonkar_gmail_com_application_default_credentials.json
+[info] ✔  dataconnect: Installed generated SDKs for functions (admin_node), bunksmart (admin_node) 
+[info] 
+=== Firestore Setup
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-01-06T08:01:11.381Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:01:11.381Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:01:11.381Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/bunk-smart/databases [none]
+[debug] [2026-01-06T08:01:11.998Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/bunk-smart/databases 200
+[debug] [2026-01-06T08:01:11.998Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/bunk-smart/databases {}
+[debug] [2026-01-06T08:01:11.999Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:01:11.999Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:01:11.999Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/bunk-smart/locations [none]
+[debug] [2026-01-06T08:01:12.117Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/bunk-smart/locations 200
+[debug] [2026-01-06T08:01:12.118Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/bunk-smart/locations {"locations":[{"name":"projects/bunk-smart/locations/eur3","labels":{"appengine.googleapis.com/geo":"europe-west","cloud.googleapis.com/location":"eur3","cloud.googleapis.com/geo":"eur3"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"eur3","displayName":"Europe"},{"name":"projects/bunk-smart/locations/nam5","labels":{"appengine.googleapis.com/geo":"us-central","cloud.googleapis.com/location":"nam5","cloud.googleapis.com/geo":"nam5"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"nam5","displayName":"United States"},{"name":"projects/bunk-smart/locations/nam7","labels":{"cloud.googleapis.com/location":"nam7","cloud.googleapis.com/geo":"nam7"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"nam7","displayName":"United States"},{"name":"projects/bunk-smart/locations/africa-south1","labels":{"cloud.googleapis.com/location":"africa-south1","cloud.googleapis.com/region":"africa-south1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"africa-south1","displayName":"Johannesburg"},{"name":"projects/bunk-smart/locations/asia-east1","labels":{"appengine.googleapis.com/region":"asia-east1","cloud.googleapis.com/location":"asia-east1","cloud.googleapis.com/region":"asia-east1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-east1","displayName":"Taiwan"},{"name":"projects/bunk-smart/locations/asia-east2","labels":{"appengine.googleapis.com/region":"asia-east2","cloud.googleapis.com/location":"asia-east2","cloud.googleapis.com/region":"asia-east2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-east2","displayName":"Hong Kong"},{"name":"projects/bunk-smart/locations/asia-northeast1","labels":{"appengine.googleapis.com/region":"asia-northeast1","cloud.googleapis.com/location":"asia-northeast1","cloud.googleapis.com/region":"asia-northeast1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-northeast1","displayName":"Tokyo"},{"name":"projects/bunk-smart/locations/asia-northeast2","labels":{"appengine.googleapis.com/region":"asia-northeast2","cloud.googleapis.com/location":"asia-northeast2","cloud.googleapis.com/region":"asia-northeast2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-northeast2","displayName":"Osaka"},{"name":"projects/bunk-smart/locations/asia-northeast3","labels":{"appengine.googleapis.com/region":"asia-northeast3","cloud.googleapis.com/location":"asia-northeast3","cloud.googleapis.com/region":"asia-northeast3"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-northeast3","displayName":"Seoul"},{"name":"projects/bunk-smart/locations/asia-south1","labels":{"appengine.googleapis.com/region":"asia-south1","cloud.googleapis.com/location":"asia-south1","cloud.googleapis.com/region":"asia-south1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-south1","displayName":"Mumbai"},{"name":"projects/bunk-smart/locations/asia-south2","labels":{"cloud.googleapis.com/location":"asia-south2","cloud.googleapis.com/region":"asia-south2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-south2","displayName":"Delhi"},{"name":"projects/bunk-smart/locations/asia-southeast1","labels":{"appengine.googleapis.com/region":"asia-southeast1","cloud.googleapis.com/location":"asia-southeast1","cloud.googleapis.com/region":"asia-southeast1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-southeast1","displayName":"Singapore"},{"name":"projects/bunk-smart/locations/asia-southeast2","labels":{"appengine.googleapis.com/region":"asia-southeast2","cloud.googleapis.com/location":"asia-southeast2","cloud.googleapis.com/region":"asia-southeast2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-southeast2","displayName":"Jakarta"},{"name":"projects/bunk-smart/locations/australia-southeast1","labels":{"appengine.googleapis.com/region":"australia-southeast1","cloud.googleapis.com/location":"australia-southeast1","cloud.googleapis.com/region":"australia-southeast1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"australia-southeast1","displayName":"Sydney"},{"name":"projects/bunk-smart/locations/australia-southeast2","labels":{"cloud.googleapis.com/location":"australia-southeast2","cloud.googleapis.com/region":"australia-southeast2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"australia-southeast2","displayName":"Melbourne"},{"name":"projects/bunk-smart/locations/europe-central2","labels":{"appengine.googleapis.com/region":"europe-central2","cloud.googleapis.com/location":"europe-central2","cloud.googleapis.com/region":"europe-central2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-central2","displayName":"Warsaw"},{"name":"projects/bunk-smart/locations/europe-north1","labels":{"cloud.googleapis.com/location":"europe-north1","cloud.googleapis.com/region":"europe-north1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-north1","displayName":"Finland"},{"name":"projects/bunk-smart/locations/europe-north2","labels":{"cloud.googleapis.com/location":"europe-north2","cloud.googleapis.com/region":"europe-north2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-north2","displayName":"Stockholm"},{"name":"projects/bunk-smart/locations/europe-southwest1","labels":{"cloud.googleapis.com/location":"europe-southwest1","cloud.googleapis.com/region":"europe-southwest1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-southwest1","displayName":"Madrid"},{"name":"projects/bunk-smart/locations/europe-west1","labels":{"cloud.googleapis.com/location":"europe-west1","cloud.googleapis.com/region":"europe-west1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west1","displayName":"Belgium"},{"name":"projects/bunk-smart/locations/europe-west10","labels":{"cloud.googleapis.com/location":"europe-west10","cloud.googleapis.com/region":"europe-west10"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west10","displayName":"Berlin"},{"name":"projects/bunk-smart/locations/europe-west12","labels":{"cloud.googleapis.com/location":"europe-west12","cloud.googleapis.com/region":"europe-west12"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west12","displayName":"Turin"},{"name":"projects/bunk-smart/locations/europe-west2","labels":{"appengine.googleapis.com/region":"europe-west2","cloud.googleapis.com/location":"europe-west2","cloud.googleapis.com/region":"europe-west2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west2","displayName":"London"},{"name":"projects/bunk-smart/locations/europe-west3","labels":{"appengine.googleapis.com/region":"europe-west3","cloud.googleapis.com/location":"europe-west3","cloud.googleapis.com/region":"europe-west3"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west3","displayName":"Frankfurt"},{"name":"projects/bunk-smart/locations/europe-west4","labels":{"cloud.googleapis.com/location":"europe-west4","cloud.googleapis.com/region":"europe-west4"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west4","displayName":"Netherlands"},{"name":"projects/bunk-smart/locations/europe-west6","labels":{"appengine.googleapis.com/region":"europe-west6","cloud.googleapis.com/location":"europe-west6","cloud.googleapis.com/region":"europe-west6"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west6","displayName":"Zurich"},{"name":"projects/bunk-smart/locations/europe-west8","labels":{"cloud.googleapis.com/location":"europe-west8","cloud.googleapis.com/region":"europe-west8"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west8","displayName":"Milan"},{"name":"projects/bunk-smart/locations/europe-west9","labels":{"cloud.googleapis.com/location":"europe-west9","cloud.googleapis.com/region":"europe-west9"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west9","displayName":"Paris"},{"name":"projects/bunk-smart/locations/me-central1","labels":{"cloud.googleapis.com/location":"me-central1","cloud.googleapis.com/region":"me-central1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"me-central1","displayName":"Doha"},{"name":"projects/bunk-smart/locations/me-central2","labels":{"cloud.googleapis.com/location":"me-central2","cloud.googleapis.com/region":"me-central2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"me-central2","displayName":"Dammam"},{"name":"projects/bunk-smart/locations/me-west1","labels":{"cloud.googleapis.com/location":"me-west1","cloud.googleapis.com/region":"me-west1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"me-west1","displayName":"Tel Aviv"},{"name":"projects/bunk-smart/locations/northamerica-northeast1","labels":{"appengine.googleapis.com/region":"northamerica-northeast1","cloud.googleapis.com/location":"northamerica-northeast1","cloud.googleapis.com/region":"northamerica-northeast1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"northamerica-northeast1","displayName":"Montréal"},{"name":"projects/bunk-smart/locations/northamerica-northeast2","labels":{"cloud.googleapis.com/location":"northamerica-northeast2","cloud.googleapis.com/region":"northamerica-northeast2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"northamerica-northeast2","displayName":"Toronto"},{"name":"projects/bunk-smart/locations/northamerica-south1","labels":{"cloud.googleapis.com/location":"northamerica-south1","cloud.googleapis.com/region":"northamerica-south1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"northamerica-south1","displayName":"Mexico"},{"name":"projects/bunk-smart/locations/southamerica-east1","labels":{"appengine.googleapis.com/region":"southamerica-east1","cloud.googleapis.com/location":"southamerica-east1","cloud.googleapis.com/region":"southamerica-east1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"southamerica-east1","displayName":"São Paulo"},{"name":"projects/bunk-smart/locations/southamerica-west1","labels":{"cloud.googleapis.com/location":"southamerica-west1","cloud.googleapis.com/region":"southamerica-west1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"southamerica-west1","displayName":"Santiago"},{"name":"projects/bunk-smart/locations/us-central1","labels":{"cloud.googleapis.com/location":"us-central1","cloud.googleapis.com/region":"us-central1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-central1","displayName":"Iowa"},{"name":"projects/bunk-smart/locations/us-east1","labels":{"appengine.googleapis.com/region":"us-east1","cloud.googleapis.com/location":"us-east1","cloud.googleapis.com/region":"us-east1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-east1","displayName":"South Carolina"},{"name":"projects/bunk-smart/locations/us-east4","labels":{"appengine.googleapis.com/region":"us-east4","cloud.googleapis.com/location":"us-east4","cloud.googleapis.com/region":"us-east4"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-east4","displayName":"Northern Virginia"},{"name":"projects/bunk-smart/locations/us-east5","labels":{"cloud.googleapis.com/location":"us-east5","cloud.googleapis.com/region":"us-east5"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-east5","displayName":"Columbus"},{"name":"projects/bunk-smart/locations/us-south1","labels":{"cloud.googleapis.com/location":"us-south1","cloud.googleapis.com/region":"us-south1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-south1","displayName":"Dallas"},{"name":"projects/bunk-smart/locations/us-west1","labels":{"appengine.googleapis.com/region":"us-west1","cloud.googleapis.com/location":"us-west1","cloud.googleapis.com/region":"us-west1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-west1","displayName":"Oregon"},{"name":"projects/bunk-smart/locations/us-west2","labels":{"appengine.googleapis.com/region":"us-west2","cloud.googleapis.com/location":"us-west2","cloud.googleapis.com/region":"us-west2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-west2","displayName":"Los Angeles"},{"name":"projects/bunk-smart/locations/us-west3","labels":{"appengine.googleapis.com/region":"us-west3","cloud.googleapis.com/location":"us-west3","cloud.googleapis.com/region":"us-west3"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-west3","displayName":"Salt Lake City"},{"name":"projects/bunk-smart/locations/us-west4","labels":{"appengine.googleapis.com/region":"us-west4","cloud.googleapis.com/location":"us-west4","cloud.googleapis.com/region":"us-west4"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-west4","displayName":"Las Vegas"}]}
+[info] 
+[info] Firestore Security Rules allow you to define how and when to allow
+[info] requests. You can keep these rules in your project directory
+[info] and publish them with firebase deploy.
+[info] 
+[debug] [2026-01-06T08:01:20.831Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:01:20.831Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:01:20.831Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/bunk-smart/releases pageSize=10&pageToken=
+[debug] [2026-01-06T08:01:21.180Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/bunk-smart/releases 200
+[debug] [2026-01-06T08:01:21.180Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/bunk-smart/releases {}
+[info] 
+[info] Firestore indexes allow you to perform complex queries while
+[info] maintaining performance that scales with the size of the result
+[info] set. You can keep index definitions in your project directory
+[info] and publish them with firebase deploy.
+[info] 
+[debug] [2026-01-06T08:01:21.459Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:01:21.460Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:01:21.460Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:01:21.460Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:01:21.460Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/bunk-smart/databases/(default)/collectionGroups/-/indexes [none]
+[debug] [2026-01-06T08:01:21.461Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/bunk-smart/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* [none]
+[debug] [2026-01-06T08:01:21.511Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/bunk-smart/databases/(default)/collectionGroups/-/indexes 404
+[debug] [2026-01-06T08:01:21.511Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/bunk-smart/databases/(default)/collectionGroups/-/indexes {"error":{"code":404,"message":"Project 'bunk-smart' or database '(default)' does not exist.","status":"NOT_FOUND"}}
+[info] i  firestore.indexes.json is unchanged 
+[info] ✔  Wrote firestore.indexes.json 
+[info] 
+=== Genkit Setup
+[debug] [2026-01-06T08:01:21.533Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/bunk-smart/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* 404
+[debug] [2026-01-06T08:01:21.534Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/bunk-smart/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* {"error":{"code":404,"message":"Project 'bunk-smart' or database '(default)' does not exist.","status":"NOT_FOUND"}}
+[debug] [2026-01-06T08:01:38.936Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-01-06T08:01:38.937Z] > authorizing via signed-in user (jishnurahegaonkar@gmail.com)
+[debug] [2026-01-06T08:01:38.937Z] [iam] checking project bunk-smart for permissions ["firebase.projects.get"]
+[debug] [2026-01-06T08:01:38.937Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:01:38.937Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:01:38.937Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/bunk-smart:testIamPermissions [none]
+[debug] [2026-01-06T08:01:38.937Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/bunk-smart:testIamPermissions x-goog-quota-user=projects/bunk-smart
+[debug] [2026-01-06T08:01:38.937Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/bunk-smart:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2026-01-06T08:01:40.325Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/bunk-smart:testIamPermissions 200
+[debug] [2026-01-06T08:01:40.325Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/bunk-smart:testIamPermissions {"permissions":["firebase.projects.get"]}
+[info] Let's create a new codebase for your functions.
+[info] A directory corresponding to the codebase will be created in your project
+[info] with sample code pre-configured.
+
+[info] See https://firebase.google.com/docs/functions/organize-functions for
+[info] more information on organizing your functions using codebases.
+
+[info] Functions can be deployed with firebase deploy.
+
+[info] ✔  Wrote functions/package.json 
+[info] i  functions/.eslintrc.js is unchanged 
+[info] i  functions/tsconfig.dev.json is unchanged 
+[info] i  Skipping write of functions/tsconfig.json 
+[info] i  functions/src/index.ts is unchanged 
+[info] i  functions/.gitignore is unchanged 
+[info] 
+[info] i  genkit: Installing Genkit CLI version 1.27.0
+ 
+[info] i  aiplatform: ensuring required API aiplatform.googleapis.com is enabled... 
+[debug] [2026-01-06T08:02:10.025Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:02:10.025Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:02:10.025Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/bunk-smart/services/aiplatform.googleapis.com [none]
+[debug] [2026-01-06T08:02:10.025Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/bunk-smart/services/aiplatform.googleapis.com x-goog-quota-user=projects/bunk-smart
+[debug] [2026-01-06T08:02:12.321Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/bunk-smart/services/aiplatform.googleapis.com 200
+[debug] [2026-01-06T08:02:12.321Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/bunk-smart/services/aiplatform.googleapis.com [omitted]
+[warn] ⚠  aiplatform: missing required API aiplatform.googleapis.com. Enabling now... 
+[debug] [2026-01-06T08:02:12.322Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:02:12.322Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:02:12.322Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/bunk-smart/services/aiplatform.googleapis.com:enable [none]
+[debug] [2026-01-06T08:02:12.322Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/bunk-smart/services/aiplatform.googleapis.com:enable x-goog-quota-user=projects/bunk-smart
+[debug] [2026-01-06T08:02:14.118Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/bunk-smart/services/aiplatform.googleapis.com:enable 200
+[debug] [2026-01-06T08:02:14.119Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/bunk-smart/services/aiplatform.googleapis.com:enable [omitted]
+[info] i  genkit: Installing NPM packages for genkit 
+[info] ✔  genkit: Successfully installed NPM packages 
+[info] i  genkit: Updating tsconfig.json 
+[warn] ⚠  genkit: Skipped updating tsconfig.json 
+[info] i  genkit: Updating package.json 
+[warn] ⚠  genkit: Skipped updating package.json 
+[info] 
+[info] 
+Login to Google Cloud using:
+[info]     gcloud auth application-default login --project bunk-smart
+
+[info] Then start the Genkit developer experience by running:
+[info]     cd functions && npm run genkit:start
+[info] 
+=== Functions Setup
+[debug] [2026-01-06T08:04:08.680Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-01-06T08:04:08.680Z] > authorizing via signed-in user (jishnurahegaonkar@gmail.com)
+[debug] [2026-01-06T08:04:08.680Z] [iam] checking project bunk-smart for permissions ["firebase.projects.get"]
+[debug] [2026-01-06T08:04:08.680Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:04:08.680Z] Checked if tokens are valid: true, expires at: 1767689215460
+[debug] [2026-01-06T08:04:08.681Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/bunk-smart:testIamPermissions [none]
+[debug] [2026-01-06T08:04:08.681Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/bunk-smart:testIamPermissions x-goog-quota-user=projects/bunk-smart
+[debug] [2026-01-06T08:04:08.681Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/bunk-smart:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2026-01-06T08:04:10.048Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/bunk-smart:testIamPermissions 200
+[debug] [2026-01-06T08:04:10.048Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/bunk-smart:testIamPermissions {"permissions":["firebase.projects.get"]}
+[info] 
+Detected existing codebase(s): default
+
+[info] Let's create a new codebase for your functions.
+[info] A directory corresponding to the codebase will be created in your project
+[info] with sample code pre-configured.
+
+[info] See https://firebase.google.com/docs/functions/organize-functions for
+[info] more information on organizing your functions using codebases.
+
+[info] Functions can be deployed with firebase deploy.
+
+[debug] [2026-01-06T08:04:18.223Z] ExitPromptError: User force closed the prompt with SIGINT
+    at Interface.sigint (/usr/local/share/nvm/versions/node/v24.11.1/lib/node_modules/firebase-tools/node_modules/@inquirer/core/dist/commonjs/lib/create-prompt.js:101:37)
+    at Interface.emit (node:events:508:28)
+    at [_ttyWrite] [as _ttyWrite] (node:internal/readline/interface:1317:18)
+    at ReadStream.onkeypress (node:internal/readline/interface:284:20)
+    at ReadStream.emit (node:events:520:35)
+    at emitKeys (node:internal/readline/utils:371:14)
+    at emitKeys.next (<anonymous>)
+    at ReadStream.onData (node:internal/readline/emitKeypressEvents:64:36)
+    at ReadStream.emit (node:events:508:28)
+    at addChunk (node:internal/streams/readable:559:12)
+[error] 
+[error] Error: An unexpected error has occurred.

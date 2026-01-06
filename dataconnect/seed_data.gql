@@ -1,0 +1,72 @@
+mutation SeedDatabase @transaction @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  student_insertMany(data: [
+    {
+      id: "11111111-1111-1111-1111-111111111111",
+      name: "Demo Student 1",
+      email: "demo1@example.com",
+      studentID: "STU111"
+    },
+    {
+      id: "22222222-2222-2222-2222-222222222222",
+      name: "Demo Student 2",
+      email: "demo2@example.com",
+      studentID: "STU222"
+    }
+  ])
+  course_insertMany(data: [
+    {
+      id: "33333333-3333-3333-3333-333333333333",
+      courseCode: "CS101",
+      courseName: "Introduction to Computer Science",
+      instructorName: "Dr. Smith"
+    },
+    {
+      id: "44444444-4444-4444-4444-444444444444",
+      courseCode: "MATH201",
+      courseName: "Calculus I",
+      instructorName: "Prof. Johnson"
+    }
+  ])
+  session_insertMany(data: [
+    {
+      id: "55555555-5555-5555-5555-555555555555",
+      courseId: "33333333-3333-3333-3333-333333333333",
+      sessionDate: "2024-03-15",
+      startTime: "2024-03-15T09:00:00Z",
+      endTime: "2024-03-15T09:50:00Z",
+      topic: "Introduction"
+    },
+    {
+      id: "66666666-6666-6666-6666-666666666666",
+      courseId: "44444444-4444-4444-4444-444444444444",
+      sessionDate: "2024-03-16",
+      startTime: "2024-03-16T10:00:00Z",
+      endTime: "2024-03-16T10:50:00Z",
+      topic: "Limits"
+    }
+  ])
+  enrollment_insertMany(data: [
+    {
+      studentId: "11111111-1111-1111-1111-111111111111",
+      courseId: "33333333-3333-3333-3333-333333333333",
+      enrollmentDate: "2024-03-01"
+    },
+    {
+      studentId: "22222222-2222-2222-2222-222222222222",
+      courseId: "44444444-4444-4444-4444-444444444444",
+      enrollmentDate: "2024-03-01"
+    }
+  ])
+  attendance_insertMany(data: [
+    {
+      studentId: "11111111-1111-1111-1111-111111111111",
+      sessionId: "55555555-5555-5555-5555-555555555555",
+      attendanceStatus: "PRESENT"
+    },
+    {
+      studentId: "22222222-2222-2222-2222-222222222222",
+      sessionId: "66666666-6666-6666-6666-666666666666",
+      attendanceStatus: "ABSENT"
+    }
+  ])
+}

@@ -1,0 +1,28 @@
+mutation AddNewStudent($email: String!, $name: String!, $studentID: String!) @auth(level: USER) {
+  student_insert(data: {email: $email, name: $name, studentID: $studentID})
+}
+
+query GetCourseByCode($courseCode: String!) @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  courses(where: {courseCode: {eq: $courseCode}}) {
+    id
+    courseCode
+    courseName
+    description
+    instructorName
+  }
+}
+
+mutation RecordAttendance($studentId: UUID!, $sessionId: UUID!, $attendanceStatus: String!) @auth(level: USER) {
+  attendance_insert(data: {studentId: $studentId, sessionId: $sessionId, attendanceStatus: $attendanceStatus, recordedAt_expr: "request.time"})
+}
+
+query GetStudentCourses @auth(level: USER) {
+  students(where: {id: {eq_expr: "auth.uid"}}) {
+    courses_via_Enrollment {
+      id
+      courseCode
+      courseName
+      instructorName
+    }
+  }
+}
