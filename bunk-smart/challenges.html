@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bunk Smart | Challenges</title>
+  <meta http-equiv="refresh" content="0;url=dashboard.html#challenges">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/challenges.css">
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <h2>Bunk Smart</h2>
+    <div class="nav-links">
+      <a href="index.html">Attendance</a>
+      <a href="insights.html">Insights</a>
+      <a href="challenges.html" class="active">Challenges</a>
+      <button>Logout</button>
+    </div>
+  </nav>
+
+  <!-- CHALLENGES -->
+  <main class="challenges-container">
+    <h3>Challenges</h3>
+
+    <div class="challenge-card">
+      <h4>30 Days Hard</h4>
+      <p>Daily discipline. No excuses.</p>
+      <div class="progress-bar"></div>
+      <button>Start</button>
+    </div>
+
+    <div class="challenge-card">
+      <h4>60 Days Hard</h4>
+      <p>Consistency over motivation.</p>
+      <div class="progress-bar"></div>
+      <button>Start</button>
+    </div>
+
+    <div class="challenge-card">
+      <h4>90 Days Hard</h4>
+      <p>Identity-level discipline.</p>
+      <div class="progress-bar"></div>
+      <button>Start</button>
+    </div>
+
+    <div class="challenge-card">
+      <h4>10 Tasks Rage</h4>
+      <p>Finish 10 tasks without stopping.</p>
+      <div class="progress-bar"></div>
+      <button>Start</button>
+    </div>
+
+  </main>
+
+  <script type="module" src="js/firebase.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/guard.js"></script>
+  <script src="js/challenges.js"></script>
+
+</body>
+</html>
