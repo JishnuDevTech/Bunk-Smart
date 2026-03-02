@@ -1,7 +1,7 @@
 // ===== DASHBOARD.JS =====
 import { auth, db } from './firebase.js';
-import { doc, getDoc, setDoc, updateDoc, collection, query, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js';
-import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js';
+import { onAuthStateChanged, updateProfile } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js';
 
 // DOM Elements
 const userNameElement = document.getElementById('user-name');
@@ -34,49 +34,66 @@ const presentDaysElement = document.getElementById('present-days');
 const bunkDaysElement = document.getElementById('bunk-days');
 const streakElement = document.getElementById('streak');
 
-// Challenge Elements
-const challengeCards = document.querySelectorAll('.challenge-card');
-let challengesData = {}; // Will load from Firebase
-
 // Current state
 let currentDate = new Date();
 let selectedDate = null;
 let attendanceData = {};
+let challengesData = {};
+let currentUser = null;
 
-// Initialize dashboard
+// ─── TOAST NOTIFICATION SYSTEM ───────────────────────────────────────────────
+function showToast(message, type = 'success', duration = 3500) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+
+    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    const icon = icons[type] || icons.success;
+
+    toast.innerHTML = `
+        <span class="toast-icon">${icon}</span>
+        <span class="toast-message">${message}</span>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+    `;
+
+    container.appendChild(toast);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => toast.classList.add('toast-show'));
+    });
+
+    // Auto remove
+    setTimeout(() => {
+        toast.classList.remove('toast-show');
+        toast.classList.add('toast-hide');
+        setTimeout(() => toast.remove(), 400);
+    }, duration);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
 function initDashboard() {
-    // If there's no local loggedInUser and no Firebase user, redirect to login
-    if (!auth.currentUser && !localStorage.getItem('loggedInUser')) {
-        window.location.href = 'login.html';
-        return;
-    }
-
-    // Wait for Firebase auth to be ready and then initialize user-specific data
     onAuthStateChanged(auth, (user) => {
         if (user) {
+            currentUser = user;
             updateUserInfo(user);
             loadUserData();
-        } else {
-            // If user is not present but local flag exists, show loading until sync
-            if (localStorage.getItem('loggedInUser')) {
-                showLoading();
-            }
+        } else if (!localStorage.getItem('loggedInUser')) {
+            window.location.href = 'login.html';
         }
     });
     setupNavigation();
     setupCalendar();
     setupModal();
-    setupChallenges();
     setupSettings();
 }
-
-// Authentication - handled by guard.js
 
 function updateUserInfo(user) {
     const displayName = user.displayName || user.email.split('@')[0];
     const email = user.email;
     const initial = displayName.charAt(0).toUpperCase();
-
     if (userNameElement) userNameElement.textContent = displayName;
     if (userEmailElement) userEmailElement.textContent = email;
     if (userInitialElement) userInitialElement.textContent = initial;
@@ -87,75 +104,70 @@ async function loadUserData() {
     try {
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
         if (!userDoc.exists()) {
-            // Create initial user document
             await setDoc(doc(db, 'users', auth.currentUser.uid), {
-                attendance: {},
-                challenges: {},
-                settings: {}
+                attendance: {}, challenges: {}, settings: {}
             });
             attendanceData = {};
+            challengesData = {};
         } else {
             const data = userDoc.data();
             attendanceData = data.attendance || {};
             challengesData = data.challenges || {};
-            // Load settings in loadSettings()
         }
         updateStats();
         renderCalendar();
         loadInsights();
-        loadChallenges(); // Ensure challenges load
+        renderChallenges();
         loadSettings();
     } catch (error) {
         console.error('Error loading user data:', error);
-        showToast('Error loading data. Please refresh.');
+        showToast('Error loading data. Please refresh.', 'error');
     } finally {
         hideLoading();
     }
 }
 
-// Navigation
+// ─── NAVIGATION ───────────────────────────────────────────────────────────────
 function setupNavigation() {
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const section = item.dataset.section;
-
-            // Update active nav item
             navItems.forEach(nav => nav.classList.remove('active'));
             item.classList.add('active');
-
-            // Show corresponding section
-            contentSections.forEach(content => {
-                content.classList.remove('active');
-            });
+            contentSections.forEach(content => content.classList.remove('active'));
             const targetSection = document.getElementById(`${section}-section`);
-            if (targetSection) {
-                targetSection.classList.add('active');
-            }
+            if (targetSection) targetSection.classList.add('active');
+
+            // Close mobile sidebar
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (sidebar) sidebar.classList.remove('open');
+            if (overlay) overlay.classList.remove('show');
+
+            // Re-render chart on insights visit
+            if (section === 'insights') setTimeout(renderAttendanceChart, 100);
         });
     });
 
-    // Sign out
     if (signoutBtn) {
         signoutBtn.addEventListener('click', async (e) => {
             e.preventDefault();
-            logoutUser();
+            import('./guard.js').then(m => m.logoutUser());
         });
     }
 }
 
-// Calendar
+// ─── CALENDAR ─────────────────────────────────────────────────────────────────
 function setupCalendar() {
-    prevMonthBtn.addEventListener('click', () => {
+    prevMonthBtn?.addEventListener('click', () => {
         currentDate.setMonth(currentDate.getMonth() - 1);
         renderCalendar();
     });
-
-    nextMonthBtn.addEventListener('click', () => {
+    nextMonthBtn?.addEventListener('click', () => {
         currentDate.setMonth(currentDate.getMonth() + 1);
         renderCalendar();
     });
-
     renderCalendar();
 }
 
@@ -163,35 +175,33 @@ function renderCalendar() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
 
-    // Update month header
-    currentMonthElement.textContent = new Date(year, month).toLocaleDateString('en-US', {
-        month: 'long',
-        year: 'numeric'
-    });
+    if (currentMonthElement) {
+        currentMonthElement.textContent = new Date(year, month).toLocaleDateString('en-US', {
+            month: 'long', year: 'numeric'
+        });
+    }
 
-    // Clear calendar
+    if (!calendarGrid) return;
     calendarGrid.innerHTML = '';
 
-    // Add day names
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     dayNames.forEach(day => {
-        const dayNameElement = document.createElement('div');
-        dayNameElement.className = 'day-name';
-        dayNameElement.textContent = day;
-        calendarGrid.appendChild(dayNameElement);
+        const el = document.createElement('div');
+        el.className = 'day-name';
+        el.textContent = day;
+        calendarGrid.appendChild(el);
     });
 
-    // Get first day of month and last day
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
 
-    // Generate calendar days
+    const todayKey = formatDate(new Date());
     const currentDateIter = new Date(startDate);
     let dayCount = 0;
-    const todayKey = formatDate(new Date());
-    while (currentDateIter <= lastDay || dayCount < 42) { // Ensure we fill the grid
+
+    while (currentDateIter <= lastDay || dayCount < 42) {
         const dayElement = document.createElement('div');
         dayElement.className = 'day-cell';
         dayElement.textContent = currentDateIter.getDate();
@@ -202,24 +212,15 @@ function renderCalendar() {
         if (!isCurrentMonth) {
             dayElement.classList.add('inactive');
         } else {
-            const attendance = attendanceData[dateKey];
-            if (attendance) {
-                console.debug('renderCalendar:', dateKey, 'status=', attendance.status);
-                if (attendance.status === 'present') {
-                    dayElement.classList.add('present');
-                } else if (attendance.status === 'bunked') {
-                    dayElement.classList.add('bunked');
-                }
+            const att = attendanceData[dateKey];
+            if (att) {
+                if (att.status === 'present') dayElement.classList.add('present');
+                else if (att.status === 'bunked') dayElement.classList.add('bunked');
             }
+            if (dateKey === todayKey) dayElement.classList.add('today');
 
-            // Capture a copy of the date for the event listener to avoid closure over the mutating iterator
             const dateCopy = new Date(currentDateIter);
             dayElement.addEventListener('click', () => openAttendanceModal(dateCopy));
-        }
-
-        // Highlight today's date
-        if (dateKey === todayKey) {
-            dayElement.classList.add('today');
         }
 
         calendarGrid.appendChild(dayElement);
@@ -228,73 +229,64 @@ function renderCalendar() {
     }
 }
 
-// Modal
+// ─── MODAL ────────────────────────────────────────────────────────────────────
 function setupModal() {
-    modalClose.addEventListener('click', closeAttendanceModal);
-    attendanceModal.addEventListener('click', (e) => {
-        if (e.target === attendanceModal) {
-            closeAttendanceModal();
-        }
+    modalClose?.addEventListener('click', closeAttendanceModal);
+    attendanceModal?.addEventListener('click', (e) => {
+        if (e.target === attendanceModal) closeAttendanceModal();
     });
 
-    markPresentBtn.addEventListener('click', () => {
-        // Select present and save immediately: close modal then save in background
-        bunkDetails.style.display = 'none';
+    markPresentBtn?.addEventListener('click', () => {
+        // Present: save immediately and close — no extra button needed
         markPresentBtn.classList.add('selected');
         markBunkBtn.classList.remove('selected');
-        // Hide explicit save button since we're saving immediately for present
+        bunkDetails.hidden = true;
         if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
-
-        // Capture the selected date, close UI immediately, then save using captured date
-        const dateToSave = selectedDate;
-        closeAttendanceModal();
-        if (dateToSave) saveAttendance(dateToSave);
+        saveAttendanceImmediate('present');
     });
 
-    markBunkBtn.addEventListener('click', () => {
-        // Show bunk details and require explicit save
-        bunkDetails.style.display = 'block';
+    markBunkBtn?.addEventListener('click', () => {
+        // Bunk: show the detail fields + save button
         markBunkBtn.classList.add('selected');
         markPresentBtn.classList.remove('selected');
+        bunkDetails.hidden = false;
         if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
     });
 
-    saveAttendanceBtn.addEventListener('click', saveAttendance);
+    saveAttendanceBtn?.addEventListener('click', saveAttendance);
 }
 
 function openAttendanceModal(date) {
     selectedDate = date;
-    selectedDateElement.textContent = date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
+    if (selectedDateElement) {
+        selectedDateElement.textContent = date.toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+    }
 
     const dateKey = formatDate(date);
-    const existingAttendance = attendanceData[dateKey];
+    const existing = attendanceData[dateKey];
 
-    if (existingAttendance) {
-        if (existingAttendance.status === 'present') {
+    markPresentBtn.classList.remove('selected');
+    markBunkBtn.classList.remove('selected');
+    bunkDetails.hidden = true;
+    if (bunkActivityInput) bunkActivityInput.value = '';
+    if (bunkMissedInput) bunkMissedInput.value = '';
+    // Save button hidden by default — only shown when Bunk is selected
+    if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
+
+    if (existing) {
+        if (existing.status === 'present') {
             markPresentBtn.classList.add('selected');
-            markBunkBtn.classList.remove('selected');
-            bunkDetails.style.display = 'none';
+            // Already present — just show state, no save button
             if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
-        } else {
+        } else if (existing.status === 'bunked') {
             markBunkBtn.classList.add('selected');
-            markPresentBtn.classList.remove('selected');
-            bunkDetails.style.display = 'block';
-            bunkActivityInput.value = existingAttendance.activity || '';
-            bunkMissedInput.value = existingAttendance.missed || '';
+            bunkDetails.hidden = false;
+            if (bunkActivityInput) bunkActivityInput.value = existing.activity || '';
+            if (bunkMissedInput) bunkMissedInput.value = existing.missed || '';
             if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
         }
-    } else {
-        markPresentBtn.classList.remove('selected');
-        markBunkBtn.classList.remove('selected');
-        bunkDetails.style.display = 'none';
-        bunkActivityInput.value = '';
-        bunkMissedInput.value = '';
-        if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
     }
 
     attendanceModal.hidden = false;
@@ -305,99 +297,104 @@ function closeAttendanceModal() {
     selectedDate = null;
 }
 
-async function saveAttendance(dateArg) {
-    const dateToUse = dateArg || selectedDate;
-    if (!dateToUse || !auth.currentUser) return;
+// Called immediately when Present is clicked — no save button needed
+async function saveAttendanceImmediate(status) {
+    if (!selectedDate || !auth.currentUser) return;
 
-    const dateKey = formatDate(dateToUse);
+    const dateKey = formatDate(selectedDate);
+    const record = {
+        date: new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).toISOString(),
+        status: status
+    };
 
-    // Determine selection state: if modal is open, use buttons; otherwise assume present when called programmatically
+    // Close modal instantly for snappy UX
+    closeAttendanceModal();
+
+    // Optimistic update
+    attendanceData[dateKey] = record;
+    updateStats();
+    renderCalendar();
+    loadInsights();
+    showToast(`✅ Present marked for ${dateKey}`, 'success');
+
+    try {
+        const ref = doc(db, 'users', auth.currentUser.uid);
+        try {
+            await updateDoc(ref, { [`attendance.${dateKey}`]: record });
+        } catch (e) {
+            await setDoc(ref, { attendance: { [dateKey]: record } }, { merge: true });
+        }
+    } catch (error) {
+        console.error('Error saving attendance:', error);
+        showToast('Error saving. Please try again.', 'error');
+    }
+}
+
+async function saveAttendance() {
+    if (!selectedDate || !auth.currentUser) return;
+
     const isBunked = markBunkBtn.classList.contains('selected');
-    const status = dateArg ? 'present' : (isBunked ? 'bunked' : (markPresentBtn.classList.contains('selected') ? 'present' : null));
+    const isPresent = markPresentBtn.classList.contains('selected');
 
-    let attendanceRecord = {
-        date: dateToUse.toISOString(),
+    if (!isPresent && !isBunked) {
+        showToast('Please select Present or Bunked first.', 'warning');
+        return;
+    }
+
+    const dateKey = formatDate(selectedDate);
+    const status = isPresent ? 'present' : 'bunked';
+
+    let record = {
+        date: new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).toISOString(),
         status: status
     };
 
     if (status === 'bunked') {
-        attendanceRecord.activity = bunkActivityInput.value;
-        attendanceRecord.missed = bunkMissedInput.value;
+        record.activity = bunkActivityInput?.value || '';
+        record.missed = bunkMissedInput?.value || '';
     }
 
-    // Optimistically update UI immediately so user sees instant feedback
-    attendanceData[dateKey] = attendanceRecord;
-    console.debug('saveAttendance: wrote to local attendanceData', dateKey, attendanceRecord);
+    // Optimistic update
+    attendanceData[dateKey] = record;
+    closeAttendanceModal();
     updateStats();
-    console.debug('saveAttendance: stats after update:', {
-        present: presentDaysElement ? presentDaysElement.textContent : null,
-        bunk: bunkDaysElement ? bunkDaysElement.textContent : null,
-        rate: attendanceRateElement ? attendanceRateElement.textContent : null
-    });
     renderCalendar();
     loadInsights();
 
-    // Don't block UI for quick present saves; show loading only for bunk or when explicitly needed
-    const shouldShowLoading = status === 'bunked';
-    if (shouldShowLoading) showLoading();
+    const statusLabel = status === 'present' ? '✅ Present' : '❌ Bunked';
+    showToast(`${statusLabel} marked for ${dateKey}`, status === 'present' ? 'success' : 'info');
 
     try {
-        // Write only the single date entry to Firestore to reduce payload and speed up writes
-        const attendanceRef = doc(db, 'users', auth.currentUser.uid);
+        const ref = doc(db, 'users', auth.currentUser.uid);
         try {
-            await updateDoc(attendanceRef, {
-                [`attendance.${dateKey}`]: attendanceRecord
-            });
+            await updateDoc(ref, { [`attendance.${dateKey}`]: record });
         } catch (e) {
-            // If update fails (e.g., document missing), fallback to setDoc merge
-            await setDoc(attendanceRef, { attendance: { [dateKey]: attendanceRecord } }, { merge: true });
-        }
-
-        if (!shouldShowLoading) showToast('Attendance saved');
-        console.debug('saveAttendance: persisted to Firestore', dateKey);
-
-        // Update challenges if present
-        if (status === 'present') {
-            Object.keys(challengesData).forEach(challengeId => {
-                if (challengesData[challengeId].active) {
-                    handleCheckIn(challengeId);
-                }
-            });
+            await setDoc(ref, { attendance: { [dateKey]: record } }, { merge: true });
         }
     } catch (error) {
         console.error('Error saving attendance:', error);
-        showToast('Error saving attendance. Please try again.');
-    } finally {
-        if (shouldShowLoading) hideLoading();
+        showToast('Error saving attendance. Please try again.', 'error');
     }
 }
 
-// Stats
+// ─── STATS ────────────────────────────────────────────────────────────────────
 function updateStats() {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
 
-    let presentCount = 0;
-    let bunkCount = 0;
-    let streakCount = 0;
-    let currentStreak = 0;
+    let presentCount = 0, bunkCount = 0, currentStreak = 0, maxStreak = 0;
 
     const sortedDates = Object.keys(attendanceData).sort();
-
     sortedDates.forEach(dateKey => {
-        const attendance = attendanceData[dateKey];
-        const date = new Date(attendance.date);
-
-        // Count for current month
+        const att = attendanceData[dateKey];
+        const date = new Date(att.date || dateKey);
         if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
-            if (attendance.status === 'present') presentCount++;
-            if (attendance.status === 'bunked') bunkCount++;
+            if (att.status === 'present') presentCount++;
+            if (att.status === 'bunked') bunkCount++;
         }
-
-        // Calculate streak
-        if (attendance.status === 'present') {
+        if (att.status === 'present') {
             currentStreak++;
-            streakCount = Math.max(streakCount, currentStreak);
+            maxStreak = Math.max(maxStreak, currentStreak);
         } else {
             currentStreak = 0;
         }
@@ -406,62 +403,64 @@ function updateStats() {
     const totalDays = presentCount + bunkCount;
     const attendanceRate = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : 0;
 
-    attendanceRateElement.textContent = `${attendanceRate}%`;
-    presentDaysElement.textContent = presentCount;
-    bunkDaysElement.textContent = bunkCount;
-    streakElement.textContent = streakCount;
+    if (attendanceRateElement) attendanceRateElement.textContent = `${attendanceRate}%`;
+    if (presentDaysElement) presentDaysElement.textContent = presentCount;
+    if (bunkDaysElement) bunkDaysElement.textContent = bunkCount;
+    if (streakElement) streakElement.textContent = currentStreak;
 
-    // Update monthly insights stats
-    const monthlyPresentElement = document.getElementById('monthly-present');
-    const monthlyBunkElement = document.getElementById('monthly-bunk');
-    const monthlyRateElement = document.getElementById('monthly-rate');
-    if (monthlyPresentElement) monthlyPresentElement.textContent = presentCount;
-    if (monthlyBunkElement) monthlyBunkElement.textContent = bunkCount;
-    if (monthlyRateElement) monthlyRateElement.textContent = `${attendanceRate}%`;
+    const monthlyPresentEl = document.getElementById('monthly-present');
+    const monthlyBunkEl = document.getElementById('monthly-bunk');
+    const monthlyRateEl = document.getElementById('monthly-rate');
+    if (monthlyPresentEl) monthlyPresentEl.textContent = presentCount;
+    if (monthlyBunkEl) monthlyBunkEl.textContent = bunkCount;
+    if (monthlyRateEl) monthlyRateEl.textContent = `${attendanceRate}%`;
 }
 
-// Insights
+// ─── INSIGHTS ─────────────────────────────────────────────────────────────────
 let attendanceChart;
 
 function loadInsights() {
     renderBunkCards();
     renderAttendanceChart();
     setupExportButtons();
-    updatePrediction();
 }
 
 function renderBunkCards() {
-    const bunkCardsContainer = document.getElementById('bunk-cards');
-    if (!bunkCardsContainer) return;
+    const container = document.getElementById('bunk-cards');
+    if (!container) return;
+    container.innerHTML = '';
 
-    bunkCardsContainer.innerHTML = '';
-    Object.keys(attendanceData).forEach(dateKey => {
-        const attendance = attendanceData[dateKey];
-        if (attendance.status === 'bunked') {
-            const card = document.createElement('div');
-            card.className = 'bunk-card';
-            card.innerHTML = `
-                <p class="date">${dateKey}</p>
-                <p class="did">✔ ${attendance.activity || 'Did something productive'}</p>
-                <p class="missed">✘ ${attendance.missed || 'Missed lecture/class'}</p>
-            `;
-            bunkCardsContainer.appendChild(card);
-        }
-    });
+    const bunkEntries = Object.keys(attendanceData)
+        .filter(k => attendanceData[k].status === 'bunked')
+        .sort((a, b) => b.localeCompare(a));
 
-    if (Object.keys(attendanceData).filter(key => attendanceData[key].status === 'bunked').length === 0) {
-        const noDataCard = document.createElement('div');
-        noDataCard.className = 'bunk-card empty';
-        noDataCard.innerHTML = '<p>No bunks yet! Keep up the good work. 🚀</p>';
-        bunkCardsContainer.appendChild(noDataCard);
+    if (bunkEntries.length === 0) {
+        container.innerHTML = `
+            <div class="bunk-empty">
+                <div class="bunk-empty-icon">🎉</div>
+                <h4>No bunks yet!</h4>
+                <p>Keep up the great work. Your attendance record is clean!</p>
+            </div>`;
+        return;
     }
+
+    bunkEntries.forEach(dateKey => {
+        const att = attendanceData[dateKey];
+        const card = document.createElement('div');
+        card.className = 'bunk-card';
+        card.innerHTML = `
+            <p class="date">📅 ${dateKey}</p>
+            <p class="did">${att.activity || 'Did something productive'}</p>
+            <p class="missed">${att.missed || 'Missed lecture/class'}</p>
+        `;
+        container.appendChild(card);
+    });
 }
 
 function renderAttendanceChart() {
     const ctx = document.getElementById('attendance-chart');
     if (!ctx) return;
 
-    // Prepare monthly data
     const monthlyData = {};
     Object.keys(attendanceData).forEach(dateKey => {
         const date = new Date(dateKey);
@@ -473,29 +472,46 @@ function renderAttendanceChart() {
     });
 
     const labels = Object.keys(monthlyData).sort();
-    const presentData = labels.map(month => (monthlyData[month].present / monthlyData[month].total * 100) || 0);
-    const bunkData = labels.map(month => (monthlyData[month].bunk / monthlyData[month].total * 100) || 0);
+    const presentData = labels.map(m => monthlyData[m].total > 0 ? Math.round((monthlyData[m].present / monthlyData[m].total) * 100) : 0);
+    const bunkData = labels.map(m => monthlyData[m].total > 0 ? Math.round((monthlyData[m].bunk / monthlyData[m].total) * 100) : 0);
+
+    // Add sample data if empty for demo
+    const finalLabels = labels.length > 0 ? labels : ['2026-01', '2026-02', '2026-03'];
+    const finalPresent = presentData.length > 0 ? presentData : [0, 0, 0];
+    const finalBunk = bunkData.length > 0 ? bunkData : [0, 0, 0];
 
     if (attendanceChart) attendanceChart.destroy();
 
     attendanceChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: labels,
+            labels: finalLabels,
             datasets: [
                 {
                     label: 'Present %',
-                    data: presentData,
+                    data: finalPresent,
                     borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#10b981',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 6,
+                    pointHoverRadius: 9,
                     tension: 0.4,
                     fill: true
                 },
                 {
                     label: 'Bunk %',
-                    data: bunkData,
+                    data: finalBunk,
                     borderColor: '#ef4444',
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#ef4444',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 6,
+                    pointHoverRadius: 9,
                     tension: 0.4,
                     fill: true
                 }
@@ -503,270 +519,442 @@ function renderAttendanceChart() {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: true,
+            interaction: { intersect: false, mode: 'index' },
             scales: {
                 y: {
                     beginAtZero: true,
                     max: 100,
-                    ticks: { callback: value => value + '%' }
+                    grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false },
+                    ticks: {
+                        callback: v => v + '%',
+                        font: { size: 12, family: "'Inter', sans-serif" },
+                        color: '#6b7280',
+                        stepSize: 25
+                    },
+                    border: { display: false }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        font: { size: 12, family: "'Inter', sans-serif" },
+                        color: '#6b7280'
+                    },
+                    border: { display: false }
                 }
             },
             plugins: {
-                legend: { position: 'top' },
-                title: { display: true, text: 'Attendance Trends' }
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(17, 24, 39, 0.92)',
+                    titleColor: '#f9fafb',
+                    bodyColor: '#d1d5db',
+                    padding: 12,
+                    cornerRadius: 8,
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    callbacks: {
+                        label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}%`
+                    }
+                }
             }
         }
     });
 }
 
-function updatePrediction() {
-    const totalPresent = Object.values(attendanceData).filter(att => att.status === 'present').length;
-    const totalDays = Object.keys(attendanceData).length;
-    const currentRate = totalDays > 0 ? (totalPresent / totalDays) * 100 : 0;
-    const remainingDays = 365 - totalDays; // Assume year
-    const projectedRate = Math.round(currentRate + (100 - currentRate) * (remainingDays / 365)); // Simple linear projection
-
-    const predictionEl = document.getElementById('prediction') || createPredictionElement();
-    predictionEl.textContent = `Projected Year-End Rate: ${projectedRate}%`;
-}
-
-function createPredictionElement() {
-    const predictionDiv = document.createElement('div');
-    predictionDiv.id = 'prediction';
-    predictionDiv.className = 'prediction';
-    predictionDiv.innerHTML = '<h4>Prediction</h4><p id="proj-rate"></p>';
-    const insightsSummary = document.querySelector('.insights-summary');
-    if (insightsSummary) insightsSummary.parentNode.insertBefore(predictionDiv, insightsSummary.nextSibling);
-    return document.getElementById('proj-rate');
-}
-
 function setupExportButtons() {
     const csvBtn = document.getElementById('export-csv');
     const pdfBtn = document.getElementById('export-pdf');
-
-    if (csvBtn) {
-        csvBtn.addEventListener('click', exportToCSV);
-    }
-
-    if (pdfBtn) {
-        pdfBtn.addEventListener('click', exportToPDF);
-    }
+    if (csvBtn) csvBtn.onclick = exportToCSV;
+    if (pdfBtn) pdfBtn.onclick = exportToPDF;
 }
 
 function exportToCSV() {
     if (Object.keys(attendanceData).length === 0) {
-        showToast('No data to export.');
-        return;
+        showToast('No data to export.', 'warning'); return;
     }
-
     let csv = 'Date,Status,Activity,Missed\n';
     Object.keys(attendanceData).sort().forEach(dateKey => {
         const att = attendanceData[dateKey];
         csv += `${dateKey},"${att.status}","${att.activity || ''}","${att.missed || ''}"\n`;
     });
-
     const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
+    a.href = URL.createObjectURL(blob);
     a.download = 'bunk-smart-attendance.csv';
     a.click();
-    URL.revokeObjectURL(url);
-    showToast('CSV exported successfully!');
+    URL.revokeObjectURL(a.href);
+    showToast('📥 CSV exported successfully!', 'success');
 }
 
 function exportToPDF() {
     if (Object.keys(attendanceData).length === 0) {
-        showToast('No data to export.');
-        return;
+        showToast('No data to export.', 'warning'); return;
     }
-
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    doc.text('Bunk Smart Attendance Report', 20, 20);
-
+    const docPdf = new jsPDF();
+    docPdf.setFontSize(16);
+    docPdf.text('Bunk Smart Attendance Report', 20, 20);
+    docPdf.setFontSize(11);
     let y = 40;
     Object.keys(attendanceData).sort().forEach(dateKey => {
         const att = attendanceData[dateKey];
-        doc.text(`${dateKey}: ${att.status} - Activity: ${att.activity || 'N/A'} - Missed: ${att.missed || 'N/A'}`, 20, y);
+        docPdf.text(`${dateKey}: ${att.status}${att.activity ? ' | Did: ' + att.activity : ''}${att.missed ? ' | Missed: ' + att.missed : ''}`, 20, y);
         y += 10;
-        if (y > 280) {
-            doc.addPage();
-            y = 20;
-        }
+        if (y > 280) { docPdf.addPage(); y = 20; }
     });
-
-    doc.save('bunk-smart-attendance.pdf');
-    showToast('PDF exported successfully!');
+    docPdf.save('bunk-smart-attendance.pdf');
+    showToast('📄 PDF exported successfully!', 'success');
 }
 
-// Challenges
-async function loadChallenges() {
-    if (!auth.currentUser) return;
-    showLoading();
-    try {
-        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-        if (userDoc.exists()) {
-            challengesData = userDoc.data().challenges || {};
-        }
-    } catch (error) {
-        console.error('Error loading challenges:', error);
-        showToast('Error loading challenges.');
-    } finally {
-        hideLoading();
-        renderChallenges();
-    }
-}
-
-function renderChallenges() {
-    challengeCards.forEach(card => {
-        const challengeId = card.dataset.challenge;
-        const challenge = challengesData[challengeId] || { progress: 0, active: false, completedDays: 0, totalDays: getTotalDays(challengeId), streak: 0 };
-        challengesData[challengeId] = challenge; // Ensure entry exists
-
-        const progressBar = card.querySelector('.progress-bar');
-        const progressText = card.querySelector('.progress-text');
-        const startBtn = card.querySelector('.start-challenge');
-        const checkInBtn = card.querySelector('.check-in-btn');
-        const badge = card.querySelector('.badge');
-
-        // Update progress
-        const progressPercent = (challenge.completedDays / challenge.totalDays) * 100;
-        progressBar.style.setProperty('--progress', progressPercent + '%');
-
-        if (challengeId === '10_tasks_rage') {
-            progressText.textContent = `Task ${challenge.completedDays}/${challenge.totalDays}`;
-        } else if (challengeId === '7_day_streak' || challengeId === 'no_bunk_week') {
-            progressText.textContent = `Streak: ${challenge.streak}/${challenge.totalDays}`;
-        } else if (challengeId === 'perfect_month') {
-            const monthlyRate = calculateMonthlyRate();
-            progressText.textContent = `Attendance: ${monthlyRate}%`;
-            progressBar.style.setProperty('--progress', monthlyRate + '%');
-        } else if (challengeId === 'custom_challenge') {
-            progressText.textContent = challenge.goal ? `Progress: ${challenge.completedDays}/${challenge.goal}` : 'Setup Required';
-        } else {
-            const daysElapsed = challenge.active ? Math.floor((new Date() - new Date(challenge.startDate)) / (1000 * 60 * 60 * 24)) + 1 : 0;
-            progressText.textContent = `Day ${Math.min(challenge.completedDays, daysElapsed)}/${challenge.totalDays}`;
-        }
-
-        // UI states
-        if (challenge.active) {
-            startBtn.hidden = true;
-            if (checkInBtn) checkInBtn.hidden = false;
-        } else {
-            startBtn.hidden = false;
-            if (checkInBtn) checkInBtn.hidden = true;
-        }
-
-        if (challenge.completedDays >= challenge.totalDays) {
-            badge.hidden = false;
-            if (checkInBtn) checkInBtn.hidden = true;
-            startBtn.textContent = 'Restart';
-        }
-
-        // Event listeners (use IDs for specificity)
-        const startId = `start-${challengeId}`;
-        const checkInId = `checkin-${challengeId}`;
-        const startEl = document.getElementById(startId);
-        const checkInEl = document.getElementById(checkInId);
-
-        if (startEl) {
-            startEl.onclick = async () => handleStartChallenge(challengeId);
-        }
-        if (checkInEl) {
-            checkInEl.onclick = async () => handleCheckIn(challengeId);
-        }
-    });
-}
-
+// ─── CHALLENGES ───────────────────────────────────────────────────────────────
 function getTotalDays(challengeId) {
     const totals = {
-        '30_days_hard': 30,
-        '60_days_hard': 60,
-        '90_days_hard': 90,
-        '7_day_streak': 7,
-        'no_bunk_week': 7,
-        'perfect_month': 1, // Special: based on month days
-        '10_tasks_rage': 10,
-        'custom_challenge': 30 // Default
+        '30_days_hard': 30, '60_days_hard': 60, '90_days_hard': 90,
+        '7_day_streak': 7, 'no_bunk_week': 7, 'perfect_month': 30,
+        '10_tasks_rage': 10, 'custom_challenge': 30
     };
     return totals[challengeId] || 30;
 }
 
+function formatDisplayDate(isoString) {
+    if (!isoString) return '—';
+    try {
+        return new Date(isoString).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch { return '—'; }
+}
+
+function renderChallenges() {
+    const challengeCards = document.querySelectorAll('.challenge-card');
+    const todayKey = formatDate(new Date());
+
+    challengeCards.forEach(card => {
+        const challengeId = card.dataset.challenge;
+        if (!challengeId) return;
+
+        if (!challengesData[challengeId]) {
+            challengesData[challengeId] = {
+                progress: 0, active: false, completedDays: 0,
+                totalDays: getTotalDays(challengeId), streak: 0,
+                markedDates: []
+            };
+        }
+
+        const challenge = challengesData[challengeId];
+        if (!challenge.markedDates) challenge.markedDates = [];
+        const totalDays = challenge.totalDays || getTotalDays(challengeId);
+        const progressPercent = Math.min((challenge.completedDays / totalDays) * 100, 100);
+
+        // Update progress bar
+        const bar = document.getElementById(`bar-${challengeId}`);
+        if (bar) bar.style.setProperty('--progress', progressPercent + '%');
+
+        // Update progress text
+        const progText = document.getElementById(`progress-${challengeId}`);
+        if (progText) {
+            if (challengeId === '10_tasks_rage') {
+                progText.textContent = `Task ${challenge.completedDays}/${totalDays}`;
+            } else if (challengeId === 'perfect_month') {
+                const rate = calculateMonthlyRate();
+                progText.textContent = `Attendance: ${rate}%`;
+                if (bar) bar.style.setProperty('--progress', rate + '%');
+            } else if (challengeId === 'custom_challenge') {
+                progText.textContent = challenge.active ? `Day ${challenge.completedDays}/${totalDays}` : 'Setup Required';
+            } else {
+                progText.textContent = `Day ${challenge.completedDays}/${totalDays}`;
+            }
+        }
+
+        // Start / check-in visibility
+        const startBtn = document.getElementById(`start-${challengeId}`);
+        const checkInBtn = document.getElementById(`checkin-${challengeId}`);
+        const badgeEl = document.getElementById(`badge-${challengeId}`);
+
+        const isCompleted = !challenge.active && challenge.completedDays > 0 && challenge.completedDays >= totalDays;
+        const hasMarkedToday = challenge.markedDates && challenge.markedDates.includes(todayKey);
+
+        if (isCompleted) {
+            if (startBtn) { startBtn.hidden = false; startBtn.textContent = '🔄 Restart'; }
+            if (checkInBtn) { checkInBtn.hidden = true; }
+            if (badgeEl) badgeEl.hidden = false;
+        } else if (challenge.active) {
+            if (startBtn) startBtn.hidden = true;
+            if (checkInBtn) {
+                checkInBtn.hidden = false;
+                if (hasMarkedToday) {
+                    checkInBtn.textContent = '✔ Marked Today';
+                    checkInBtn.disabled = true;
+                    checkInBtn.classList.add('marked-today');
+                } else {
+                    checkInBtn.textContent = challengeId === '10_tasks_rage' ? '✅ Complete Task' : '✅ Mark Today';
+                    checkInBtn.disabled = false;
+                    checkInBtn.classList.remove('marked-today');
+                }
+            }
+        } else {
+            if (startBtn) {
+                startBtn.hidden = false;
+                startBtn.textContent = challengeId === 'custom_challenge' ? '✏️ Customize & Start' : '🚀 Start Challenge';
+            }
+            if (checkInBtn) checkInBtn.hidden = true;
+        }
+
+        // Update detail panel info
+        const startDateEl = document.getElementById(`start-date-${challengeId}`);
+        if (startDateEl) startDateEl.textContent = formatDisplayDate(challenge.startDate);
+
+        const completedEl = document.getElementById(`completed-${challengeId}`);
+        if (completedEl) completedEl.textContent = `${challenge.completedDays} / ${totalDays}`;
+
+        const todayStatusEl = document.getElementById(`today-status-${challengeId}`);
+        if (todayStatusEl) {
+            todayStatusEl.textContent = hasMarkedToday ? '✔ Done' : (challenge.active ? '⏳ Not yet' : '—');
+        }
+
+        // Marked days mini grid
+        const markedGrid = document.getElementById(`marked-grid-${challengeId}`);
+        if (markedGrid && challenge.markedDates && challenge.markedDates.length > 0) {
+            markedGrid.innerHTML = '<p class="marked-grid-label">📅 Marked Dates:</p>';
+            challenge.markedDates.slice(-20).forEach(d => {
+                const chip = document.createElement('span');
+                chip.className = 'date-chip';
+                chip.textContent = d;
+                markedGrid.appendChild(chip);
+            });
+        }
+
+        // Custom challenge active info
+        if (challengeId === 'custom_challenge') {
+            const setupForm = document.getElementById('custom-setup-form');
+            const activeInfo = document.getElementById('custom-active-info');
+            if (challenge.active && challenge.name) {
+                if (setupForm) setupForm.style.display = 'none';
+                if (activeInfo) activeInfo.style.display = 'block';
+                const catDisplay = document.getElementById('custom-cat-display');
+                const goalDisplay = document.getElementById('custom-goal-display');
+                if (catDisplay) catDisplay.textContent = challenge.category || '—';
+                if (goalDisplay) goalDisplay.textContent = challenge.dailyGoal || '—';
+                // Update custom card title
+                const titleEl = document.getElementById('custom-challenge-title');
+                const descEl = document.getElementById('custom-challenge-desc');
+                if (titleEl && challenge.name) titleEl.textContent = challenge.name;
+                if (descEl && challenge.description) descEl.textContent = challenge.description;
+            } else if (!challenge.active) {
+                if (setupForm) setupForm.style.display = 'block';
+                if (activeInfo) activeInfo.style.display = 'none';
+            }
+        }
+
+        // Attach event handlers
+        const startEl = document.getElementById(`start-${challengeId}`);
+        if (startEl) {
+            startEl.onclick = () => handleStartChallenge(challengeId);
+        }
+
+        const checkInEl = document.getElementById(`checkin-${challengeId}`);
+        if (checkInEl) {
+            checkInEl.onclick = () => handleCheckIn(challengeId);
+        }
+    });
+
+    // Custom challenge modal buttons
+    const createCustomBtn = document.getElementById('create-custom-challenge');
+    if (createCustomBtn) createCustomBtn.onclick = handleCreateCustomChallenge;
+
+    const closeCustomBtn = document.getElementById('close-custom-modal');
+    if (closeCustomBtn) closeCustomBtn.onclick = closeCustomChallengeModal;
+
+    const modalOverlay = document.getElementById('custom-challenge-modal');
+    if (modalOverlay) {
+        modalOverlay.onclick = function(e) {
+            if (e.target === modalOverlay) closeCustomChallengeModal();
+        };
+    }
+
+    // Reset custom challenge
+    const resetCustomBtn = document.getElementById('reset-custom-challenge');
+    if (resetCustomBtn) resetCustomBtn.onclick = handleResetCustomChallenge;
+}
+
 async function handleStartChallenge(challengeId) {
     if (!auth.currentUser) return;
-    const challenge = challengesData[challengeId] || { progress: 0, active: false, completedDays: 0, totalDays: getTotalDays(challengeId), streak: 0 };
-    challenge.active = true;
-    challenge.startDate = new Date().toISOString();
+
+    // Custom challenge: open floating modal
     if (challengeId === 'custom_challenge') {
-        const goal = prompt('Enter your goal (e.g., number of days/tasks):');
-        if (goal) challenge.goal = parseInt(goal) || 30;
+        openCustomChallengeModal();
+        return;
     }
-    challengesData[challengeId] = challenge;
+
+    const existing = challengesData[challengeId] || {};
+    const isRestart = !existing.active && existing.completedDays >= (existing.totalDays || getTotalDays(challengeId));
+
+    challengesData[challengeId] = {
+        active: true,
+        startDate: new Date().toISOString(),
+        completedDays: 0,
+        totalDays: getTotalDays(challengeId),
+        streak: 0,
+        markedDates: []
+    };
+
     await saveChallenges();
     renderChallenges();
-    showToast('Challenge started! Mark daily to progress.');
+    showToast(`🚀 ${isRestart ? 'Restarted' : 'Started'} challenge! Mark today to begin.`, 'success');
 }
 
 async function handleCheckIn(challengeId) {
     if (!auth.currentUser) return;
-    const todayKey = formatDate(new Date());
-    const todayAttendance = attendanceData[todayKey];
 
-    if (!todayAttendance || todayAttendance.status !== 'present') {
-        alert('You must mark today as present in attendance to check in!');
+    const challenge = challengesData[challengeId];
+    if (!challenge || !challenge.active) return;
+
+    const todayKey = formatDate(new Date());
+    if (!challenge.markedDates) challenge.markedDates = [];
+
+    // Prevent double-marking today
+    if (challenge.markedDates.includes(todayKey)) {
+        showToast('Already marked today! Come back tomorrow. 💪', 'info');
         return;
     }
 
-    const challenge = challengesData[challengeId];
-    if (!challenge.active) return;
-
-    challenge.completedDays = Math.min(challenge.completedDays + 1, challenge.totalDays);
-    challenge.streak++;
-
-    // Special logic
-    if (challengeId === '10_tasks_rage') {
-        // Task-based, no attendance req
-    } else if (challengeId === 'perfect_month') {
-        // Auto-update based on monthly rate
-        challenge.completedDays = 1; // Complete if rate 100%
-        if (calculateMonthlyRate() < 100) challenge.completedDays = 0;
-    } else if (challengeId === 'no_bunk_week') {
-        // Check no bunks in week
-        const weekStart = new Date();
-        weekStart.setDate(weekStart.getDate() - 7);
-        const hasBunk = Object.values(attendanceData).some(att => att.status === 'bunked' && new Date(att.date) >= weekStart);
-        if (hasBunk) challenge.streak = 0;
+    // For attendance-based challenges, check attendance
+    const attendanceBased = ['30_days_hard', '60_days_hard', '90_days_hard', '7_day_streak', 'no_bunk_week'];
+    if (attendanceBased.includes(challengeId)) {
+        const todayAtt = attendanceData[todayKey];
+        if (!todayAtt || todayAtt.status !== 'present') {
+            showToast('⚠️ Mark today as Present in Attendance first!', 'warning');
+            return;
+        }
     }
 
+    // For no_bunk_week, check no bunks in past 7 days
+    if (challengeId === 'no_bunk_week') {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const hasBunk = Object.keys(attendanceData).some(k => {
+            return attendanceData[k].status === 'bunked' && new Date(k) >= sevenDaysAgo;
+        });
+        if (hasBunk) {
+            challenge.streak = 0;
+            challenge.completedDays = 0;
+            showToast('❌ Bunk detected in last 7 days. Streak reset!', 'error');
+            await saveChallenges();
+            renderChallenges();
+            return;
+        }
+    }
+
+    challenge.completedDays = Math.min(challenge.completedDays + 1, challenge.totalDays);
+    challenge.streak = (challenge.streak || 0) + 1;
+    challenge.markedDates.push(todayKey);
+
     if (challenge.completedDays >= challenge.totalDays) {
-        showToast(`Challenge completed! 🎉 Unlocked badge.`);
+        challenge.active = false;
+        showToast(`🏆 Challenge COMPLETED! You are unstoppable! 🎉`, 'success', 5000);
     } else {
-        showToast('Daily check-in successful! Keep going.');
+        const remaining = challenge.totalDays - challenge.completedDays;
+        showToast(`✅ Day ${challenge.completedDays}/${challenge.totalDays} done! ${remaining} days to go. Keep going! 🔥`, 'success');
     }
 
     await saveChallenges();
     renderChallenges();
-    updateStats(); // Refresh if needed
+}
+
+function openCustomChallengeModal() {
+    // If already active, open the details panel to show info
+    const ch = challengesData['custom_challenge'];
+    if (ch && ch.active && ch.name) {
+        const panel = document.getElementById('details-custom_challenge');
+        const icon  = document.getElementById('expand-custom_challenge');
+        if (panel) panel.hidden = false;
+        if (icon) icon.textContent = '▲';
+        return;
+    }
+    // Otherwise open floating modal
+    const modal = document.getElementById('custom-challenge-modal');
+    if (modal) modal.hidden = false;
+    // Reset form
+    ['custom-name','custom-description','custom-daily-goal'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+    });
+    const dEl = document.getElementById('custom-days'); if (dEl) dEl.value = '21';
+    const cEl = document.getElementById('custom-category'); if (cEl) cEl.value = 'attendance';
+}
+
+function closeCustomChallengeModal() {
+    const modal = document.getElementById('custom-challenge-modal');
+    if (modal) modal.hidden = true;
+}
+
+async function handleCreateCustomChallenge() {
+    const name      = document.getElementById('custom-name')?.value?.trim();
+    const category  = document.getElementById('custom-category')?.value;
+    const days      = parseInt(document.getElementById('custom-days')?.value);
+    const description = document.getElementById('custom-description')?.value?.trim();
+    const dailyGoal = document.getElementById('custom-daily-goal')?.value?.trim();
+
+    if (!name) { showToast('Please enter a challenge name.', 'warning'); return; }
+    if (!days || days < 1) { showToast('Please enter valid number of days.', 'warning'); return; }
+
+    challengesData['custom_challenge'] = {
+        active: true, name, category,
+        description: description || `${days}-day ${name} challenge`,
+        dailyGoal, startDate: new Date().toISOString(),
+        completedDays: 0, totalDays: days, streak: 0, markedDates: []
+    };
+
+    closeCustomChallengeModal();
+    await saveChallenges();
+    renderChallenges();
+    showToast(`🎨 "${name}" challenge created! Let's go!`, 'success');
+}
+
+async function handleResetCustomChallenge() {
+    if (!confirm('Reset this custom challenge? Your progress will be lost.')) return;
+    challengesData['custom_challenge'] = {
+        active: false, completedDays: 0, totalDays: 30, streak: 0, markedDates: []
+    };
+    const titleEl = document.getElementById('custom-challenge-title');
+    const descEl = document.getElementById('custom-challenge-desc');
+    if (titleEl) titleEl.textContent = 'Custom Challenge';
+    if (descEl) descEl.textContent = 'Create your own personal goal.';
+    const progressText = document.getElementById('progress-custom_challenge');
+    if (progressText) progressText.textContent = 'Setup Required';
+
+    // Clear inputs
+    ['custom-name', 'custom-description', 'custom-daily-goal'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const daysInput = document.getElementById('custom-days');
+    if (daysInput) daysInput.value = '21';
+
+    await saveChallenges();
+    renderChallenges();
+    showToast('Custom challenge reset. Configure a new one!', 'info');
 }
 
 async function saveChallenges() {
     if (!auth.currentUser) return;
     try {
-        await updateDoc(doc(db, 'users', auth.currentUser.uid), {
-            challenges: challengesData
-        });
+        const ref = doc(db, 'users', auth.currentUser.uid);
+        try {
+            await updateDoc(ref, { challenges: challengesData });
+        } catch (e) {
+            await setDoc(ref, { challenges: challengesData }, { merge: true });
+        }
     } catch (error) {
         console.error('Error saving challenges:', error);
+        showToast('Error saving challenge progress.', 'error');
     }
 }
 
 function calculateMonthlyRate() {
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
+    const m = new Date().getMonth(), y = new Date().getFullYear();
     let present = 0, total = 0;
     Object.values(attendanceData).forEach(att => {
-        const date = new Date(att.date);
-        if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
+        const d = new Date(att.date || '');
+        if (d.getMonth() === m && d.getFullYear() === y) {
             total++;
             if (att.status === 'present') present++;
         }
@@ -774,300 +962,131 @@ function calculateMonthlyRate() {
     return total > 0 ? Math.round((present / total) * 100) : 0;
 }
 
-function setupChallenges() {
-    loadChallenges(); // Initial load
-    // Re-render on attendance change or interval if needed
-}
-
-// Settings
+// ─── SETTINGS ─────────────────────────────────────────────────────────────────
 function setupSettings() {
-    // Profile settings
-    const displayNameInput = document.getElementById('display-name');
-    const emailNotificationsCheckbox = document.getElementById('email-notifications');
-    const pushNotificationsCheckbox = document.getElementById('push-notifications');
-    const reminderTimeInput = document.getElementById('reminder-time');
-
-    // App preferences
-    const themeSelect = document.getElementById('theme');
-    const startWeekSelect = document.getElementById('start-week');
-    const languageSelect = document.getElementById('language');
-    const timezoneSelect = document.getElementById('timezone');
-
-    // Attendance settings
-    const defaultAttendanceSelect = document.getElementById('default-attendance');
-    const attendanceReminderCheckbox = document.getElementById('attendance-reminder');
-    const streakGoalInput = document.getElementById('streak-goal');
-    const workingDaysCheckboxes = document.querySelectorAll('input[name="working-days"]');
-
-    // Privacy & Security
-    const dataSharingCheckbox = document.getElementById('data-sharing');
-    const twoFactorCheckbox = document.getElementById('two-factor');
-    const sessionTimeoutSelect = document.getElementById('session-timeout');
-
-    // Data management
-    const autoBackupCheckbox = document.getElementById('auto-backup');
-    const backupFrequencySelect = document.getElementById('backup-frequency');
-    const exportDataBtn = document.getElementById('export-data');
-    const importDataBtn = document.getElementById('import-data');
-    const clearDataBtn = document.getElementById('clear-data');
-
-    // Support & Help
-    const helpCenterBtn = document.getElementById('help-center');
-    const contactSupportBtn = document.getElementById('contact-support');
-    const reportIssueBtn = document.getElementById('report-issue');
-
-    // Load current settings
-    loadSettings();
-
-    // Profile settings event listeners
-    if (displayNameInput) {
-        displayNameInput.addEventListener('change', (e) => {
-            saveSetting('displayName', e.target.value);
-            updateUserInfo(auth.currentUser);
+    // Display name save button
+    const saveDisplayNameBtn = document.getElementById('save-display-name');
+    if (saveDisplayNameBtn) {
+        saveDisplayNameBtn.addEventListener('click', async () => {
+            const displayNameInput = document.getElementById('display-name');
+            const newName = displayNameInput?.value?.trim();
+            if (!newName) { showToast('Please enter a display name.', 'warning'); return; }
+            try {
+                if (auth.currentUser) {
+                    await updateProfile(auth.currentUser, { displayName: newName });
+                    await saveSetting('displayName', newName);
+                    updateUserInfo(auth.currentUser);
+                    showToast('✅ Display name updated!', 'success');
+                }
+            } catch (e) {
+                console.error('Error updating name:', e);
+                showToast('Error updating display name.', 'error');
+            }
         });
     }
 
-    if (emailNotificationsCheckbox) {
-        emailNotificationsCheckbox.addEventListener('change', (e) => {
-            saveSetting('emailNotifications', e.target.checked);
-        });
-    }
+    // All toggle/select/input settings
+    const settingBindings = [
+        { id: 'email-notifications', key: 'emailNotifications', type: 'checkbox' },
+        { id: 'push-notifications', key: 'pushNotifications', type: 'checkbox' },
+        { id: 'reminder-time', key: 'reminderTime', type: 'input' },
+        { id: 'theme', key: 'theme', type: 'select', onChange: applyTheme },
+        { id: 'start-week', key: 'startWeek', type: 'select', onChange: renderCalendar },
+        { id: 'language', key: 'language', type: 'select' },
+        { id: 'timezone', key: 'timezone', type: 'select' },
+        { id: 'default-attendance', key: 'defaultAttendance', type: 'select' },
+        { id: 'attendance-reminder', key: 'attendanceReminder', type: 'checkbox' },
+        { id: 'streak-goal', key: 'streakGoal', type: 'input' },
+        { id: 'data-sharing', key: 'dataSharing', type: 'checkbox' },
+        { id: 'two-factor', key: 'twoFactor', type: 'checkbox', onChange: () => showToast('Two-factor auth setting saved.', 'info') },
+        { id: 'session-timeout', key: 'sessionTimeout', type: 'select' },
+        { id: 'auto-backup', key: 'autoBackup', type: 'checkbox' },
+        { id: 'backup-frequency', key: 'backupFrequency', type: 'select' },
+    ];
 
-    if (pushNotificationsCheckbox) {
-        pushNotificationsCheckbox.addEventListener('change', (e) => {
-            saveSetting('pushNotifications', e.target.checked);
-        });
-    }
-
-    if (reminderTimeInput) {
-        reminderTimeInput.addEventListener('change', (e) => {
-            saveSetting('reminderTime', e.target.value);
-        });
-    }
-
-    // App preferences event listeners
-    if (themeSelect) {
-        themeSelect.addEventListener('change', (e) => {
-            saveSetting('theme', e.target.value);
-            applyTheme(e.target.value);
-        });
-    }
-
-    if (startWeekSelect) {
-        startWeekSelect.addEventListener('change', (e) => {
-            saveSetting('startWeek', e.target.value);
-            renderCalendar();
-        });
-    }
-
-    if (languageSelect) {
-        languageSelect.addEventListener('change', (e) => {
-            saveSetting('language', e.target.value);
-            // In a real app, this would change the UI language
-            alert('Language change will take effect after refresh');
-        });
-    }
-
-    if (timezoneSelect) {
-        timezoneSelect.addEventListener('change', (e) => {
-            saveSetting('timezone', e.target.value);
-        });
-    }
-
-    // Attendance settings event listeners
-    if (defaultAttendanceSelect) {
-        defaultAttendanceSelect.addEventListener('change', (e) => {
-            saveSetting('defaultAttendance', e.target.value);
-        });
-    }
-
-    if (attendanceReminderCheckbox) {
-        attendanceReminderCheckbox.addEventListener('change', (e) => {
-            saveSetting('attendanceReminder', e.target.checked);
-        });
-    }
-
-    if (streakGoalInput) {
-        streakGoalInput.addEventListener('change', (e) => {
-            saveSetting('streakGoal', parseInt(e.target.value));
-        });
-    }
-
-    workingDaysCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', () => {
-            const workingDays = Array.from(workingDaysCheckboxes)
-                .filter(cb => cb.checked)
-                .map(cb => cb.value);
-            saveSetting('workingDays', workingDays);
+    settingBindings.forEach(({ id, key, type, onChange }) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const event = type === 'checkbox' ? 'change' : 'change';
+        el.addEventListener(event, async (e) => {
+            const val = type === 'checkbox' ? e.target.checked : e.target.value;
+            await saveSetting(key, val);
+            if (onChange) onChange(val);
+            if (id !== 'theme' && id !== 'start-week' && id !== 'two-factor') {
+                showToast('⚙️ Setting saved.', 'success', 2000);
+            }
         });
     });
 
-    // Privacy & Security event listeners
-    if (dataSharingCheckbox) {
-        dataSharingCheckbox.addEventListener('change', (e) => {
-            saveSetting('dataSharing', e.target.checked);
+    // Working days
+    document.querySelectorAll('input[name="working-days"]').forEach(cb => {
+        cb.addEventListener('change', async () => {
+            const workingDays = Array.from(document.querySelectorAll('input[name="working-days"]'))
+                .filter(c => c.checked).map(c => c.value);
+            await saveSetting('workingDays', workingDays);
+            showToast('⚙️ Working days updated.', 'success', 2000);
         });
-    }
+    });
 
-    if (twoFactorCheckbox) {
-        twoFactorCheckbox.addEventListener('change', (e) => {
-            saveSetting('twoFactor', e.target.checked);
-            // In a real app, this would enable/disable 2FA
-            alert('Two-factor authentication settings saved');
-        });
-    }
+    // Data management
+    const exportDataBtn = document.getElementById('export-data');
+    const importDataBtn = document.getElementById('import-data');
+    const clearDataBtn = document.getElementById('clear-data');
+    if (exportDataBtn) exportDataBtn.addEventListener('click', exportUserData);
+    if (importDataBtn) importDataBtn.addEventListener('click', importUserData);
+    if (clearDataBtn) clearDataBtn.addEventListener('click', clearAllData);
 
-    if (sessionTimeoutSelect) {
-        sessionTimeoutSelect.addEventListener('change', (e) => {
-            saveSetting('sessionTimeout', parseInt(e.target.value));
-        });
-    }
-
-    // Data management event listeners
-    if (autoBackupCheckbox) {
-        autoBackupCheckbox.addEventListener('change', (e) => {
-            saveSetting('autoBackup', e.target.checked);
-        });
-    }
-
-    if (backupFrequencySelect) {
-        backupFrequencySelect.addEventListener('change', (e) => {
-            saveSetting('backupFrequency', e.target.value);
-        });
-    }
-
-    if (exportDataBtn) {
-        exportDataBtn.addEventListener('click', exportUserData);
-    }
-
-    if (importDataBtn) {
-        importDataBtn.addEventListener('click', importUserData);
-    }
-
-    if (clearDataBtn) {
-        clearDataBtn.addEventListener('click', clearAllData);
-    }
-
-    // Support & Help event listeners
-    if (helpCenterBtn) {
-        helpCenterBtn.addEventListener('click', () => {
-            window.open('https://help.bunksmart.com', '_blank');
-        });
-    }
-
-    if (contactSupportBtn) {
-        contactSupportBtn.addEventListener('click', () => {
-            window.open('mailto:support@bunksmart.com', '_blank');
-        });
-    }
-
-    if (reportIssueBtn) {
-        reportIssueBtn.addEventListener('click', () => {
-            window.open('https://github.com/bunksmart/issues', '_blank');
-        });
-    }
+    // Support
+    const helpCenterBtn = document.getElementById('help-center');
+    const contactSupportBtn = document.getElementById('contact-support');
+    const reportIssueBtn = document.getElementById('report-issue');
+    if (helpCenterBtn) helpCenterBtn.addEventListener('click', () => { window.open('mailto:jishnurahegaonkar@gmail.com', '_blank'); });
+    if (contactSupportBtn) contactSupportBtn.addEventListener('click', () => { window.open('mailto:jishnurahegaonkar@gmail.com', '_blank'); });
+    if (reportIssueBtn) reportIssueBtn.addEventListener('click', () => { window.open('mailto:jishnurahegaonkar@gmail.com?subject=Bug Report', '_blank'); });
 }
 
 async function loadSettings() {
     if (!auth.currentUser) return;
-
     try {
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-        const userData = userDoc.data() || {};
-        const settings = userData.settings || {};
+        const settings = (userDoc.data() || {}).settings || {};
 
-        // Profile settings
         const displayNameInput = document.getElementById('display-name');
         if (displayNameInput) {
             displayNameInput.value = settings.displayName || auth.currentUser.displayName || auth.currentUser.email.split('@')[0];
         }
 
-        const emailNotificationsCheckbox = document.getElementById('email-notifications');
-        if (emailNotificationsCheckbox) {
-            emailNotificationsCheckbox.checked = settings.emailNotifications !== false;
-        }
+        const fields = [
+            { id: 'email-notifications', key: 'emailNotifications', def: true, type: 'checkbox' },
+            { id: 'push-notifications', key: 'pushNotifications', def: true, type: 'checkbox' },
+            { id: 'reminder-time', key: 'reminderTime', def: '09:00', type: 'input' },
+            { id: 'theme', key: 'theme', def: 'light', type: 'select' },
+            { id: 'start-week', key: 'startWeek', def: 'sunday', type: 'select' },
+            { id: 'language', key: 'language', def: 'en', type: 'select' },
+            { id: 'timezone', key: 'timezone', def: 'Asia/Kolkata', type: 'select' },
+            { id: 'default-attendance', key: 'defaultAttendance', def: 'ask', type: 'select' },
+            { id: 'attendance-reminder', key: 'attendanceReminder', def: true, type: 'checkbox' },
+            { id: 'streak-goal', key: 'streakGoal', def: 95, type: 'input' },
+            { id: 'data-sharing', key: 'dataSharing', def: false, type: 'checkbox' },
+            { id: 'two-factor', key: 'twoFactor', def: false, type: 'checkbox' },
+            { id: 'session-timeout', key: 'sessionTimeout', def: '60', type: 'select' },
+            { id: 'auto-backup', key: 'autoBackup', def: true, type: 'checkbox' },
+            { id: 'backup-frequency', key: 'backupFrequency', def: 'weekly', type: 'select' },
+        ];
 
-        const pushNotificationsCheckbox = document.getElementById('push-notifications');
-        if (pushNotificationsCheckbox) {
-            pushNotificationsCheckbox.checked = settings.pushNotifications !== false;
-        }
-
-        const reminderTimeInput = document.getElementById('reminder-time');
-        if (reminderTimeInput) {
-            reminderTimeInput.value = settings.reminderTime || '09:00';
-        }
-
-        // App preferences
-        const themeSelect = document.getElementById('theme');
-        if (themeSelect) {
-            themeSelect.value = settings.theme || 'light';
-        }
-
-        const startWeekSelect = document.getElementById('start-week');
-        if (startWeekSelect) {
-            startWeekSelect.value = settings.startWeek || 'sunday';
-        }
-
-        const languageSelect = document.getElementById('language');
-        if (languageSelect) {
-            languageSelect.value = settings.language || 'en';
-        }
-
-        const timezoneSelect = document.getElementById('timezone');
-        if (timezoneSelect) {
-            timezoneSelect.value = settings.timezone || 'Asia/Kolkata';
-        }
-
-        // Attendance settings
-        const defaultAttendanceSelect = document.getElementById('default-attendance');
-        if (defaultAttendanceSelect) {
-            defaultAttendanceSelect.value = settings.defaultAttendance || 'ask';
-        }
-
-        const attendanceReminderCheckbox = document.getElementById('attendance-reminder');
-        if (attendanceReminderCheckbox) {
-            attendanceReminderCheckbox.checked = settings.attendanceReminder !== false;
-        }
-
-        const streakGoalInput = document.getElementById('streak-goal');
-        if (streakGoalInput) {
-            streakGoalInput.value = settings.streakGoal || 95;
-        }
-
-        const workingDaysCheckboxes = document.querySelectorAll('input[name="working-days"]');
-        const workingDays = settings.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-        workingDaysCheckboxes.forEach(checkbox => {
-            checkbox.checked = workingDays.includes(checkbox.value);
+        fields.forEach(({ id, key, def, type }) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const val = settings[key] !== undefined ? settings[key] : def;
+            if (type === 'checkbox') el.checked = val;
+            else el.value = String(val);
         });
 
-        // Privacy & Security
-        const dataSharingCheckbox = document.getElementById('data-sharing');
-        if (dataSharingCheckbox) {
-            dataSharingCheckbox.checked = settings.dataSharing || false;
-        }
+        const workingDays = settings.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        document.querySelectorAll('input[name="working-days"]').forEach(cb => {
+            cb.checked = workingDays.includes(cb.value);
+        });
 
-        const twoFactorCheckbox = document.getElementById('two-factor');
-        if (twoFactorCheckbox) {
-            twoFactorCheckbox.checked = settings.twoFactor || false;
-        }
-
-        const sessionTimeoutSelect = document.getElementById('session-timeout');
-        if (sessionTimeoutSelect) {
-            sessionTimeoutSelect.value = (settings.sessionTimeout || 60).toString();
-        }
-
-        // Data management
-        const autoBackupCheckbox = document.getElementById('auto-backup');
-        if (autoBackupCheckbox) {
-            autoBackupCheckbox.checked = settings.autoBackup !== false;
-        }
-
-        const backupFrequencySelect = document.getElementById('backup-frequency');
-        if (backupFrequencySelect) {
-            backupFrequencySelect.value = settings.backupFrequency || 'weekly';
-        }
-
-        // Apply current theme
         applyTheme(settings.theme || 'light');
     } catch (error) {
         console.error('Error loading settings:', error);
@@ -1075,13 +1094,14 @@ async function loadSettings() {
 }
 
 async function saveSetting(key, value) {
-    if (!currentUser) return;
-
+    if (!auth.currentUser) return;
     try {
-        const settingsRef = doc(db, 'users', auth.currentUser.uid);
-        await updateDoc(settingsRef, {
-            [`settings.${key}`]: value
-        });
+        const ref = doc(db, 'users', auth.currentUser.uid);
+        try {
+            await updateDoc(ref, { [`settings.${key}`]: value });
+        } catch (e) {
+            await setDoc(ref, { settings: { [key]: value } }, { merge: true });
+        }
     } catch (error) {
         console.error('Error saving setting:', error);
     }
@@ -1094,37 +1114,38 @@ function applyTheme(theme) {
     if (theme === 'dark') {
         body.classList.add('theme-dark');
     } else if (theme === 'auto') {
-        body.classList.add('theme-auto');
-        // Check system preference
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
             body.classList.add('theme-dark');
+        } else {
+            body.classList.add('theme-light');
         }
     } else {
         body.classList.add('theme-light');
     }
+
+    // Persist preference immediately to localStorage for fast re-apply on reload
+    localStorage.setItem('bunkSmartTheme', theme);
 }
+
+// Apply saved theme immediately on load (before Firebase)
+const savedTheme = localStorage.getItem('bunkSmartTheme');
+if (savedTheme) applyTheme(savedTheme);
 
 async function exportUserData() {
     if (!auth.currentUser) return;
-
     try {
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-        const userData = userDoc.data() || {};
-
-        const dataStr = JSON.stringify(userData, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-
+        const data = JSON.stringify(userDoc.data() || {}, null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
         const link = document.createElement('a');
-        link.href = URL.createObjectURL(dataBlob);
-        link.download = `bunk-smart-data-${new Date().toISOString().split('T')[0]}.json`;
+        link.href = URL.createObjectURL(blob);
+        link.download = `bunk-smart-backup-${new Date().toISOString().split('T')[0]}.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-
-        alert('Data exported successfully!');
-    } catch (error) {
-        console.error('Error exporting data:', error);
-        alert('Error exporting data. Please try again.');
+        showToast('📥 Data exported successfully!', 'success');
+    } catch (e) {
+        showToast('Error exporting data.', 'error');
     }
 }
 
@@ -1132,93 +1153,54 @@ async function importUserData() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
-
     input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         try {
             const text = await file.text();
             const data = JSON.parse(text);
-
-            // Validate data structure
             if (!data.attendance && !data.settings) {
-                alert('Invalid data format. Please select a valid Bunk Smart export file.');
-                return;
+                showToast('Invalid file format.', 'error'); return;
             }
-
-            const confirmImport = confirm('This will overwrite your current data. Are you sure you want to continue?');
-            if (!confirmImport) return;
-
-            // Import data
+            if (!confirm('This will overwrite your current data. Continue?')) return;
             const updateData = {};
             if (data.attendance) updateData.attendance = data.attendance;
             if (data.settings) updateData.settings = data.settings;
-
-            await updateDoc(doc(db, 'users', currentUser.uid), updateData);
-
-            // Reload data
+            await updateDoc(doc(db, 'users', auth.currentUser.uid), updateData);
             attendanceData = data.attendance || {};
-            updateStats();
-            renderCalendar();
-            loadInsights();
-            loadSettings();
-
-            alert('Data imported successfully!');
-        } catch (error) {
-            console.error('Error importing data:', error);
-            alert('Error importing data. Please check the file format.');
+            updateStats(); renderCalendar(); loadInsights(); loadSettings();
+            showToast('📤 Data imported successfully!', 'success');
+        } catch (e) {
+            showToast('Error importing data. Check file format.', 'error');
         }
     };
-
     input.click();
 }
 
 async function clearAllData() {
-    if (!currentUser) return;
-
-    const confirmClear = confirm('Are you sure you want to clear all your data? This action cannot be undone.');
-    if (!confirmClear) return;
-
+    if (!auth.currentUser) return;
+    if (!confirm('Clear ALL data? This cannot be undone.')) return;
     try {
-        await updateDoc(doc(db, 'users', currentUser.uid), {
-            attendance: {},
-            settings: {},
-            challenges: {}
+        await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+            attendance: {}, settings: {}, challenges: {}
         });
-
-        // Reset local state
         attendanceData = {};
-        updateStats();
-        renderCalendar();
-        loadInsights();
-
-        alert('All data cleared successfully!');
-    } catch (error) {
-        console.error('Error clearing data:', error);
-        alert('Error clearing data. Please try again.');
+        challengesData = {};
+        updateStats(); renderCalendar(); loadInsights(); renderChallenges();
+        showToast('🗑️ All data cleared.', 'info');
+    } catch (e) {
+        showToast('Error clearing data.', 'error');
     }
 }
 
-// Utility functions
+// ─── UTILS ────────────────────────────────────────────────────────────────────
 function formatDate(date) {
-    // Use local date components to avoid UTC shift issues
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
 }
 
-// Simple toast function (will be enhanced with js/toasts.js later)
-function showToast(message) {
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
-}
-
-// Loading functions
 function showLoading() {
     let overlay = document.querySelector('.loading-overlay');
     if (!overlay) {
@@ -1228,19 +1210,13 @@ function showLoading() {
         document.body.appendChild(overlay);
     }
     overlay.style.display = 'flex';
-    // Force hide after 10 seconds if stuck
-    setTimeout(() => {
-        hideLoading();
-        console.warn('Loading timeout - hiding spinner');
-    }, 10000);
+    setTimeout(() => hideLoading(), 10000);
 }
 
 function hideLoading() {
     const overlay = document.querySelector('.loading-overlay');
-    if (overlay) {
-        overlay.style.display = 'none';
-    }
+    if (overlay) overlay.style.display = 'none';
 }
 
-// Initialize when DOM is loaded
+// Initialize
 document.addEventListener('DOMContentLoaded', initDashboard);
