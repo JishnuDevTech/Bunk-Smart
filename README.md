@@ -61,6 +61,20 @@ Check out the live project:
 - Firebase Database  
 - Netlify Hosting  
 
+### Python calculation engine
+
+The dependency-free engine in `python/attendance_engine.py` is the canonical
+place for attendance rules: monthly rate, streaks, trend data, holidays, and
+future-date validation. Run its focused checks with:
+
+```bash
+python3 -m unittest discover -s python -p 'test_*.py'
+```
+
+The current Netlify frontend still reads Firebase directly, so it cannot run
+Python in the browser. The module uses the same record contract and is ready
+to be called from a Python API when server-side scoring is introduced.
+
 ---
 
 ## Contributing

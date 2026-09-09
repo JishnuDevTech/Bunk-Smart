@@ -774,6 +774,10 @@
           <span class="btn-icon">❌</span>
           <span>Bunked</span>
         </button>
+        <button class="attendance-btn holiday-btn" id="mark-holiday">
+          <span class="btn-icon">🏖️</span>
+          <span>Holiday</span>
+        </button>
       </div>
 
       <div class="bunk-details" id="bunk-details" hidden>
@@ -781,6 +785,11 @@
         <input type="text" id="bunk-activity" placeholder="e.g., Built a project">
         <label>What I missed</label>
         <input type="text" id="bunk-missed" placeholder="e.g., DBMS lecture">
+      </div>
+
+      <div class="holiday-details" id="holiday-details" hidden>
+        <label for="holiday-title">Holiday title</label>
+        <input type="text" id="holiday-title" placeholder="e.g., Onam Holiday or College Protest">
       </div>
 
       <button id="save-attendance" class="btn-primary">Save Attendance</button>

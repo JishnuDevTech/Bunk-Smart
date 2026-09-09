@@ -23,7 +23,10 @@ const modalClose = document.getElementById('modal-close');
 const selectedDateElement = document.getElementById('selected-date');
 const markPresentBtn = document.getElementById('mark-present');
 const markBunkBtn = document.getElementById('mark-bunk');
+const markHolidayBtn = document.getElementById('mark-holiday');
 const bunkDetails = document.getElementById('bunk-details');
+const holidayDetails = document.getElementById('holiday-details');
+const holidayTitleInput = document.getElementById('holiday-title');
 const bunkActivityInput = document.getElementById('bunk-activity');
 const bunkMissedInput = document.getElementById('bunk-missed');
 const saveAttendanceBtn = document.getElementById('save-attendance');
@@ -162,13 +165,20 @@ function setupNavigation() {
 function setupCalendar() {
     prevMonthBtn?.addEventListener('click', () => {
         currentDate.setMonth(currentDate.getMonth() - 1);
-        renderCalendar();
+        renderCurrentMonth();
     });
     nextMonthBtn?.addEventListener('click', () => {
         currentDate.setMonth(currentDate.getMonth() + 1);
-        renderCalendar();
+        renderCurrentMonth();
     });
     renderCalendar();
+}
+
+function renderCurrentMonth() {
+    updateStats();
+    renderCalendar();
+    renderBunkCards();
+    renderAttendanceChart();
 }
 
 function renderCalendar() {
@@ -216,11 +226,20 @@ function renderCalendar() {
             if (att) {
                 if (att.status === 'present') dayElement.classList.add('present');
                 else if (att.status === 'bunked') dayElement.classList.add('bunked');
+                else if (att.status === 'holiday') {
+                    dayElement.classList.add('holiday');
+                    dayElement.title = att.title || 'Holiday';
+                }
             }
             if (dateKey === todayKey) dayElement.classList.add('today');
 
             const dateCopy = new Date(currentDateIter);
-            dayElement.addEventListener('click', () => openAttendanceModal(dateCopy));
+            if (dateCopy <= new Date()) {
+                dayElement.addEventListener('click', () => openAttendanceModal(dateCopy));
+            } else {
+                dayElement.classList.add('locked');
+                dayElement.title = 'Future dates are locked';
+            }
         }
 
         calendarGrid.appendChild(dayElement);
@@ -240,7 +259,9 @@ function setupModal() {
         // Present: save immediately and close — no extra button needed
         markPresentBtn.classList.add('selected');
         markBunkBtn.classList.remove('selected');
+        markHolidayBtn?.classList.remove('selected');
         bunkDetails.hidden = true;
+        if (holidayDetails) holidayDetails.hidden = true;
         if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
         saveAttendanceImmediate('present');
     });
@@ -249,7 +270,18 @@ function setupModal() {
         // Bunk: show the detail fields + save button
         markBunkBtn.classList.add('selected');
         markPresentBtn.classList.remove('selected');
+        markHolidayBtn?.classList.remove('selected');
+        if (holidayDetails) holidayDetails.hidden = true;
         bunkDetails.hidden = false;
+        if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
+    });
+
+    markHolidayBtn?.addEventListener('click', () => {
+        markHolidayBtn.classList.add('selected');
+        markPresentBtn.classList.remove('selected');
+        markBunkBtn.classList.remove('selected');
+        bunkDetails.hidden = true;
+        if (holidayDetails) holidayDetails.hidden = false;
         if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
     });
 
@@ -257,6 +289,7 @@ function setupModal() {
 }
 
 function openAttendanceModal(date) {
+    if (date > new Date()) return;
     selectedDate = date;
     if (selectedDateElement) {
         selectedDateElement.textContent = date.toLocaleDateString('en-US', {
@@ -269,9 +302,12 @@ function openAttendanceModal(date) {
 
     markPresentBtn.classList.remove('selected');
     markBunkBtn.classList.remove('selected');
+    markHolidayBtn?.classList.remove('selected');
     bunkDetails.hidden = true;
+    if (holidayDetails) holidayDetails.hidden = true;
     if (bunkActivityInput) bunkActivityInput.value = '';
     if (bunkMissedInput) bunkMissedInput.value = '';
+    if (holidayTitleInput) holidayTitleInput.value = '';
     // Save button hidden by default — only shown when Bunk is selected
     if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
 
@@ -285,6 +321,11 @@ function openAttendanceModal(date) {
             bunkDetails.hidden = false;
             if (bunkActivityInput) bunkActivityInput.value = existing.activity || '';
             if (bunkMissedInput) bunkMissedInput.value = existing.missed || '';
+            if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
+        } else if (existing.status === 'holiday') {
+            markHolidayBtn?.classList.add('selected');
+            if (holidayDetails) holidayDetails.hidden = false;
+            if (holidayTitleInput) holidayTitleInput.value = existing.title || '';
             if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
         }
     }
@@ -300,6 +341,10 @@ function closeAttendanceModal() {
 // Called immediately when Present is clicked — no save button needed
 async function saveAttendanceImmediate(status) {
     if (!selectedDate || !auth.currentUser) return;
+    if (selectedDate > new Date()) {
+        showToast('Future dates are locked.', 'warning');
+        return;
+    }
 
     const dateKey = formatDate(selectedDate);
     const record = {
@@ -312,9 +357,7 @@ async function saveAttendanceImmediate(status) {
 
     // Optimistic update
     attendanceData[dateKey] = record;
-    updateStats();
-    renderCalendar();
-    loadInsights();
+    renderCurrentMonth();
     showToast(`✅ Present marked for ${dateKey}`, 'success');
 
     try {
@@ -332,17 +375,22 @@ async function saveAttendanceImmediate(status) {
 
 async function saveAttendance() {
     if (!selectedDate || !auth.currentUser) return;
+    if (selectedDate > new Date()) {
+        showToast('Future dates are locked.', 'warning');
+        return;
+    }
 
     const isBunked = markBunkBtn.classList.contains('selected');
     const isPresent = markPresentBtn.classList.contains('selected');
+    const isHoliday = markHolidayBtn?.classList.contains('selected');
 
-    if (!isPresent && !isBunked) {
-        showToast('Please select Present or Bunked first.', 'warning');
+    if (!isPresent && !isBunked && !isHoliday) {
+        showToast('Choose Present, Bunked, or Holiday first.', 'warning');
         return;
     }
 
     const dateKey = formatDate(selectedDate);
-    const status = isPresent ? 'present' : 'bunked';
+    const status = isPresent ? 'present' : isBunked ? 'bunked' : 'holiday';
 
     let record = {
         date: new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).toISOString(),
@@ -353,15 +401,14 @@ async function saveAttendance() {
         record.activity = bunkActivityInput?.value || '';
         record.missed = bunkMissedInput?.value || '';
     }
+    if (status === 'holiday') record.title = holidayTitleInput?.value.trim() || 'Holiday';
 
     // Optimistic update
     attendanceData[dateKey] = record;
     closeAttendanceModal();
-    updateStats();
-    renderCalendar();
-    loadInsights();
+    renderCurrentMonth();
 
-    const statusLabel = status === 'present' ? '✅ Present' : '❌ Bunked';
+    const statusLabel = status === 'present' ? '✅ Present' : status === 'bunked' ? '❌ Bunked' : '🏖️ Holiday';
     showToast(`${statusLabel} marked for ${dateKey}`, status === 'present' ? 'success' : 'info');
 
     try {
@@ -379,29 +426,8 @@ async function saveAttendance() {
 
 // ─── STATS ────────────────────────────────────────────────────────────────────
 function updateStats() {
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-
-    let presentCount = 0, bunkCount = 0, currentStreak = 0, maxStreak = 0;
-
-    const sortedDates = Object.keys(attendanceData).sort();
-    sortedDates.forEach(dateKey => {
-        const att = attendanceData[dateKey];
-        const date = new Date(att.date || dateKey);
-        if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
-            if (att.status === 'present') presentCount++;
-            if (att.status === 'bunked') bunkCount++;
-        }
-        if (att.status === 'present') {
-            currentStreak++;
-            maxStreak = Math.max(maxStreak, currentStreak);
-        } else {
-            currentStreak = 0;
-        }
-    });
-
-    const totalDays = presentCount + bunkCount;
-    const attendanceRate = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : 0;
+    const metrics = getMonthMetrics(currentDate.getFullYear(), currentDate.getMonth());
+    const { presentCount, bunkCount, attendanceRate, currentStreak } = metrics;
 
     if (attendanceRateElement) attendanceRateElement.textContent = `${attendanceRate}%`;
     if (presentDaysElement) presentDaysElement.textContent = presentCount;
@@ -414,6 +440,22 @@ function updateStats() {
     if (monthlyPresentEl) monthlyPresentEl.textContent = presentCount;
     if (monthlyBunkEl) monthlyBunkEl.textContent = bunkCount;
     if (monthlyRateEl) monthlyRateEl.textContent = `${attendanceRate}%`;
+}
+
+function getMonthMetrics(year, month) {
+    const entries = Object.entries(attendanceData)
+        .filter(([dateKey, att]) => {
+            const date = new Date(`${dateKey}T00:00:00`);
+            return date.getFullYear() === year && date.getMonth() === month;
+        })
+        .sort(([a], [b]) => a.localeCompare(b));
+    const presentCount = entries.filter(([, att]) => att.status === 'present').length;
+    const bunkCount = entries.filter(([, att]) => att.status === 'bunked').length;
+    const attendanceRate = presentCount + bunkCount > 0
+        ? Math.round((presentCount / (presentCount + bunkCount)) * 100) : 0;
+    let currentStreak = 0;
+    for (let i = entries.length - 1; i >= 0 && entries[i][1].status === 'present'; i--) currentStreak++;
+    return { presentCount, bunkCount, attendanceRate, currentStreak };
 }
 
 // ─── INSIGHTS ─────────────────────────────────────────────────────────────────
@@ -431,7 +473,7 @@ function renderBunkCards() {
     container.innerHTML = '';
 
     const bunkEntries = Object.keys(attendanceData)
-        .filter(k => attendanceData[k].status === 'bunked')
+        .filter(k => attendanceData[k].status === 'bunked' && new Date(`${k}T00:00:00`).getFullYear() === currentDate.getFullYear() && new Date(`${k}T00:00:00`).getMonth() === currentDate.getMonth())
         .sort((a, b) => b.localeCompare(a));
 
     if (bunkEntries.length === 0) {
@@ -463,27 +505,32 @@ function renderAttendanceChart() {
 
     const monthlyData = {};
     Object.keys(attendanceData).forEach(dateKey => {
-        const date = new Date(dateKey);
+        const date = new Date(`${dateKey}T00:00:00`);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         if (!monthlyData[monthKey]) monthlyData[monthKey] = { present: 0, bunk: 0, total: 0 };
-        monthlyData[monthKey].total++;
-        if (attendanceData[dateKey].status === 'present') monthlyData[monthKey].present++;
-        else if (attendanceData[dateKey].status === 'bunked') monthlyData[monthKey].bunk++;
+        if (attendanceData[dateKey].status === 'present') {
+            monthlyData[monthKey].present++;
+            monthlyData[monthKey].total++;
+        } else if (attendanceData[dateKey].status === 'bunked') {
+            monthlyData[monthKey].bunk++;
+            monthlyData[monthKey].total++;
+        }
     });
 
     const labels = Object.keys(monthlyData).sort();
     const presentData = labels.map(m => monthlyData[m].total > 0 ? Math.round((monthlyData[m].present / monthlyData[m].total) * 100) : 0);
     const bunkData = labels.map(m => monthlyData[m].total > 0 ? Math.round((monthlyData[m].bunk / monthlyData[m].total) * 100) : 0);
 
-    // Add sample data if empty for demo
-    const finalLabels = labels.length > 0 ? labels : ['2026-01', '2026-02', '2026-03'];
-    const finalPresent = presentData.length > 0 ? presentData : [0, 0, 0];
-    const finalBunk = bunkData.length > 0 ? bunkData : [0, 0, 0];
+    const finalLabels = labels.length > 0 ? labels : [`${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`];
+    const finalPresent = presentData.length > 0 ? presentData : [0];
+    const finalBunk = bunkData.length > 0 ? bunkData : [0];
 
     if (attendanceChart) attendanceChart.destroy();
 
+    const mutedColor = getComputedStyle(document.body).getPropertyValue('--muted').trim() || '#6b7280';
+
     attendanceChart = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
             labels: finalLabels,
             datasets: [
@@ -498,8 +545,9 @@ function renderAttendanceChart() {
                     pointBorderWidth: 2,
                     pointRadius: 6,
                     pointHoverRadius: 9,
-                    tension: 0.4,
-                    fill: true
+                    borderRadius: 5,
+                    barPercentage: 0.72,
+                    categoryPercentage: 0.62
                 },
                 {
                     label: 'Bunk %',
@@ -512,14 +560,15 @@ function renderAttendanceChart() {
                     pointBorderWidth: 2,
                     pointRadius: 6,
                     pointHoverRadius: 9,
-                    tension: 0.4,
-                    fill: true
+                    borderRadius: 5,
+                    barPercentage: 0.72,
+                    categoryPercentage: 0.62
                 }
             ]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             interaction: { intersect: false, mode: 'index' },
             scales: {
                 y: {
@@ -529,7 +578,7 @@ function renderAttendanceChart() {
                     ticks: {
                         callback: v => v + '%',
                         font: { size: 12, family: "'Inter', sans-serif" },
-                        color: '#6b7280',
+                        color: mutedColor,
                         stepSize: 25
                     },
                     border: { display: false }
@@ -538,7 +587,7 @@ function renderAttendanceChart() {
                     grid: { display: false },
                     ticks: {
                         font: { size: 12, family: "'Inter', sans-serif" },
-                        color: '#6b7280'
+                        color: mutedColor
                     },
                     border: { display: false }
                 }
