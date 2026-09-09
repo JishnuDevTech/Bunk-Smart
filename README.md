@@ -75,6 +75,23 @@ The current Netlify frontend still reads Firebase directly, so it cannot run
 Python in the browser. The module uses the same record contract and is ready
 to be called from a Python API when server-side scoring is introduced.
 
+### Optional smart-calendar integrations
+
+- Public holiday suggestions use [Nager.Date](https://date.nager.at/). It is
+	free for this use and does not require an API key. The frontend calls its
+	public-holiday endpoint after the user chooses a country.
+- College calendars need no API key: upload a CSV with `date,title` columns or
+	a JSON array such as `[{"date":"2026-09-15","title":"College holiday"}]`.
+- Browser reminders use the Web Notifications API and require the user's
+	browser permission. They work while the app is open; reliable background
+	reminders require a service worker and push provider later.
+
+For a production backend, use a server-side provider such as
+[Calendarific](https://calendarific.com/) or
+[Google Calendar API](https://developers.google.com/calendar/api). Put those
+keys in server environment variables such as `CALENDARIFIC_API_KEY`, never in
+`dashboard.js`, HTML, Firebase documents, or a public Netlify deployment.
+
 ---
 
 ## Contributing

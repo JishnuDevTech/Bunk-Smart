@@ -1,6 +1,6 @@
 // ===== DASHBOARD.JS =====
 import { auth, db } from './firebase.js';
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js';
 import { onAuthStateChanged, updateProfile } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js';
 
 // DOM Elements
@@ -30,6 +30,7 @@ const holidayTitleInput = document.getElementById('holiday-title');
 const bunkActivityInput = document.getElementById('bunk-activity');
 const bunkMissedInput = document.getElementById('bunk-missed');
 const saveAttendanceBtn = document.getElementById('save-attendance');
+const clearAttendanceBtn = document.getElementById('clear-attendance');
 
 // Stats Elements
 const attendanceRateElement = document.getElementById('attendance-rate');
@@ -43,6 +44,8 @@ let selectedDate = null;
 let attendanceData = {};
 let challengesData = {};
 let currentUser = null;
+let userSettings = { language: 'en', timezone: 'Asia/Kolkata', sessionTimeout: '60', autoBackup: true, backupFrequency: 'weekly' };
+let sessionTimer;
 
 // ─── TOAST NOTIFICATION SYSTEM ───────────────────────────────────────────────
 function showToast(message, type = 'success', duration = 3500) {
@@ -122,6 +125,7 @@ async function loadUserData() {
         loadInsights();
         renderChallenges();
         loadSettings();
+            renderSmartInsights();
     } catch (error) {
         console.error('Error loading user data:', error);
         showToast('Error loading data. Please refresh.', 'error');
@@ -186,7 +190,7 @@ function renderCalendar() {
     const month = currentDate.getMonth();
 
     if (currentMonthElement) {
-        currentMonthElement.textContent = new Date(year, month).toLocaleDateString('en-US', {
+        currentMonthElement.textContent = formatUserDate(new Date(year, month, 1), {
             month: 'long', year: 'numeric'
         });
     }
@@ -194,7 +198,11 @@ function renderCalendar() {
     if (!calendarGrid) return;
     calendarGrid.innerHTML = '';
 
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weekStart = document.getElementById('start-week')?.value === 'monday' ? 1 : 0;
+    const dayNames = Array.from({ length: 7 }, (_, index) => {
+        const day = new Date(2026, 0, 4 + ((index + weekStart) % 7));
+        return formatUserDate(day, { weekday: 'short' });
+    });
     dayNames.forEach(day => {
         const el = document.createElement('div');
         el.className = 'day-name';
@@ -287,13 +295,14 @@ function setupModal() {
     });
 
     saveAttendanceBtn?.addEventListener('click', saveAttendance);
+    clearAttendanceBtn?.addEventListener('click', clearAttendance);
 }
 
 function openAttendanceModal(date) {
     if (date > new Date()) return;
     selectedDate = date;
     if (selectedDateElement) {
-        selectedDateElement.textContent = date.toLocaleDateString('en-US', {
+        selectedDateElement.textContent = formatUserDate(date, {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
         });
     }
@@ -311,6 +320,7 @@ function openAttendanceModal(date) {
     if (holidayTitleInput) holidayTitleInput.value = '';
     // Save button is only needed for a holiday title.
     if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
+    if (clearAttendanceBtn) clearAttendanceBtn.hidden = !existing;
 
     if (existing) {
         if (existing.status === 'present') {
@@ -328,6 +338,16 @@ function openAttendanceModal(date) {
             if (holidayDetails) holidayDetails.hidden = false;
             if (holidayTitleInput) holidayTitleInput.value = existing.title || '';
             if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
+        }
+    }
+
+    if (!existing) {
+        const defaultAttendance = document.getElementById('default-attendance')?.value;
+        if (defaultAttendance === 'present' || defaultAttendance === 'bunked') {
+            attendanceModal.hidden = false;
+            if (defaultAttendance === 'present') markPresentBtn?.click();
+            else markBunkBtn?.click();
+            return;
         }
     }
 
@@ -372,6 +392,28 @@ async function saveAttendanceImmediate(status) {
     } catch (error) {
         console.error('Error saving attendance:', error);
         showToast('Error saving. Please try again.', 'error');
+    }
+}
+
+async function clearAttendance() {
+    if (!selectedDate || !auth.currentUser) return;
+    const dateKey = formatDate(selectedDate);
+    const existing = attendanceData[dateKey];
+    if (!existing) {
+        closeAttendanceModal();
+        return;
+    }
+    closeAttendanceModal();
+    delete attendanceData[dateKey];
+    renderCurrentMonth();
+    showToast(`↩️ ${dateKey} returned to unmarked`, 'info');
+    try {
+        await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+            [`attendance.${dateKey}`]: deleteField()
+        });
+    } catch (error) {
+        console.error('Error clearing attendance:', error);
+        showToast('Could not clear this attendance record.', 'error');
     }
 }
 
@@ -671,7 +713,7 @@ function getTotalDays(challengeId) {
 function formatDisplayDate(isoString) {
     if (!isoString) return '—';
     try {
-        return new Date(isoString).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+        return formatUserDate(new Date(isoString), { day: 'numeric', month: 'short', year: 'numeric' });
     } catch { return '—'; }
 }
 
@@ -1043,16 +1085,24 @@ function setupSettings() {
         { id: 'reminder-time', key: 'reminderTime', type: 'input' },
         { id: 'theme', key: 'theme', type: 'select', onChange: applyTheme },
         { id: 'start-week', key: 'startWeek', type: 'select', onChange: renderCalendar },
-        { id: 'language', key: 'language', type: 'select' },
-        { id: 'timezone', key: 'timezone', type: 'select' },
+        { id: 'language', key: 'language', type: 'select', onChange: applyLanguage },
+        { id: 'timezone', key: 'timezone', type: 'select', onChange: () => { userSettings.timezone = document.getElementById('timezone')?.value; renderCalendar(); renderSmartInsights(); } },
         { id: 'default-attendance', key: 'defaultAttendance', type: 'select' },
         { id: 'attendance-reminder', key: 'attendanceReminder', type: 'checkbox' },
         { id: 'streak-goal', key: 'streakGoal', type: 'input' },
         { id: 'data-sharing', key: 'dataSharing', type: 'checkbox' },
-        { id: 'two-factor', key: 'twoFactor', type: 'checkbox', onChange: () => showToast('Two-factor auth setting saved.', 'info') },
-        { id: 'session-timeout', key: 'sessionTimeout', type: 'select' },
-        { id: 'auto-backup', key: 'autoBackup', type: 'checkbox' },
-        { id: 'backup-frequency', key: 'backupFrequency', type: 'select' },
+        { id: 'two-factor', key: 'twoFactor', type: 'checkbox', onChange: handleTwoFactorToggle },
+        { id: 'session-timeout', key: 'sessionTimeout', type: 'select', onChange: scheduleSessionTimeout },
+        { id: 'auto-backup', key: 'autoBackup', type: 'checkbox', onChange: scheduleAutoBackup },
+        { id: 'backup-frequency', key: 'backupFrequency', type: 'select', onChange: scheduleAutoBackup },
+        { id: 'holiday-country', key: 'holidayCountry', type: 'select' },
+        { id: 'holiday-state', key: 'holidayState', type: 'input' },
+        { id: 'holiday-city', key: 'holidayCity', type: 'input' },
+        { id: 'holiday-district', key: 'holidayDistrict', type: 'input' },
+        { id: 'institution-name', key: 'institutionName', type: 'input' },
+        { id: 'holiday-suggestions', key: 'holidaySuggestions', type: 'checkbox' },
+        { id: 'smart-reminders', key: 'smartReminders', type: 'checkbox', onChange: scheduleSmartReminder },
+        { id: 'smart-target', key: 'smartTarget', type: 'input', onChange: renderSmartInsights },
     ];
 
     settingBindings.forEach(({ id, key, type, onChange }) => {
@@ -1061,9 +1111,12 @@ function setupSettings() {
         const event = type === 'checkbox' ? 'change' : 'change';
         el.addEventListener(event, async (e) => {
             const val = type === 'checkbox' ? e.target.checked : e.target.value;
+            userSettings[key] = val;
             await saveSetting(key, val);
             if (onChange) onChange(val);
-            if (id !== 'theme' && id !== 'start-week' && id !== 'two-factor') {
+            if (id === 'email-notifications' || id === 'push-notifications') {
+                showToast('Preference saved. Delivery needs a notification service.', 'info', 3000);
+            } else if (id !== 'theme' && id !== 'start-week' && id !== 'two-factor') {
                 showToast('⚙️ Setting saved.', 'success', 2000);
             }
         });
@@ -1075,6 +1128,7 @@ function setupSettings() {
             const workingDays = Array.from(document.querySelectorAll('input[name="working-days"]'))
                 .filter(c => c.checked).map(c => c.value);
             await saveSetting('workingDays', workingDays);
+            renderSmartInsights();
             showToast('⚙️ Working days updated.', 'success', 2000);
         });
     });
@@ -1094,6 +1148,12 @@ function setupSettings() {
     if (helpCenterBtn) helpCenterBtn.addEventListener('click', () => { window.open('mailto:jishnurahegaonkar@gmail.com', '_blank'); });
     if (contactSupportBtn) contactSupportBtn.addEventListener('click', () => { window.open('mailto:jishnurahegaonkar@gmail.com', '_blank'); });
     if (reportIssueBtn) reportIssueBtn.addEventListener('click', () => { window.open('mailto:jishnurahegaonkar@gmail.com?subject=Bug Report', '_blank'); });
+
+    document.getElementById('fetch-holidays')?.addEventListener('click', fetchHolidaySuggestions);
+    document.getElementById('enable-reminders')?.addEventListener('click', requestReminderPermission);
+    document.getElementById('detect-location')?.addEventListener('click', detectLocation);
+    document.getElementById('college-calendar-file')?.addEventListener('change', handleCollegeCalendarUpload);
+    updateNotificationStatus();
 }
 
 async function loadSettings() {
@@ -1123,6 +1183,14 @@ async function loadSettings() {
             { id: 'session-timeout', key: 'sessionTimeout', def: '60', type: 'select' },
             { id: 'auto-backup', key: 'autoBackup', def: true, type: 'checkbox' },
             { id: 'backup-frequency', key: 'backupFrequency', def: 'weekly', type: 'select' },
+            { id: 'holiday-country', key: 'holidayCountry', def: 'IN', type: 'select' },
+            { id: 'holiday-state', key: 'holidayState', def: '', type: 'input' },
+            { id: 'holiday-city', key: 'holidayCity', def: '', type: 'input' },
+            { id: 'holiday-district', key: 'holidayDistrict', def: '', type: 'input' },
+            { id: 'institution-name', key: 'institutionName', def: '', type: 'input' },
+            { id: 'holiday-suggestions', key: 'holidaySuggestions', def: true, type: 'checkbox' },
+            { id: 'smart-reminders', key: 'smartReminders', def: false, type: 'checkbox' },
+            { id: 'smart-target', key: 'smartTarget', def: 75, type: 'input' },
         ];
 
         fields.forEach(({ id, key, def, type }) => {
@@ -1131,6 +1199,7 @@ async function loadSettings() {
             const val = settings[key] !== undefined ? settings[key] : def;
             if (type === 'checkbox') el.checked = val;
             else el.value = String(val);
+            userSettings[key] = val;
         });
 
         const workingDays = settings.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
@@ -1139,9 +1208,209 @@ async function loadSettings() {
         });
 
         applyTheme(settings.theme || 'light');
+        applyLanguage(settings.language || 'en');
+        scheduleSessionTimeout(settings.sessionTimeout || '60');
+        scheduleAutoBackup(settings.autoBackup !== false);
+        renderSmartInsights();
+        scheduleSmartReminder(settings.smartReminders);
     } catch (error) {
         console.error('Error loading settings:', error);
     }
+}
+
+function getWorkingDayNames() {
+    return Array.from(document.querySelectorAll('input[name="working-days"]'))
+        .filter(input => input.checked).map(input => input.value);
+}
+
+function isWorkingDay(date) {
+    const names = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    return getWorkingDayNames().includes(names[date.getDay()]);
+}
+
+function renderSmartInsights() {
+    const container = document.getElementById('smart-insights');
+    if (!container) return;
+    const target = Math.min(100, Math.max(1, Number(document.getElementById('smart-target')?.value || 75))) / 100;
+    const now = new Date();
+    const metrics = getMonthMetrics(now.getFullYear(), now.getMonth());
+    const tracked = metrics.presentCount + metrics.bunkCount;
+    let remainingWorkingDays = 0;
+    for (let cursor = new Date(now); cursor.getMonth() === now.getMonth(); cursor.setDate(cursor.getDate() + 1)) {
+        const key = formatDate(cursor);
+        if (cursor > now && isWorkingDay(cursor) && !attendanceData[key]) remainingWorkingDays++;
+    }
+    const projectedRate = tracked + remainingWorkingDays > 0
+        ? Math.round(((metrics.presentCount + remainingWorkingDays) / (tracked + remainingWorkingDays)) * 100) : 0;
+    const safeBunks = tracked > 0 ? Math.max(0, Math.floor(metrics.presentCount / target - tracked)) : 0;
+
+    const weekdayTotals = {};
+    Object.entries(attendanceData).forEach(([key, record]) => {
+        if (!['present', 'bunked'].includes(record.status)) return;
+        const weekday = new Date(`${key}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
+        if (!weekdayTotals[weekday]) weekdayTotals[weekday] = { present: 0, total: 0 };
+        weekdayTotals[weekday].total++;
+        if (record.status === 'present') weekdayTotals[weekday].present++;
+    });
+    const weakestDay = Object.entries(weekdayTotals).sort(([, a], [, b]) => (a.present / a.total) - (b.present / b.total))[0];
+    const pattern = weakestDay ? `${weakestDay[0]} is your weakest day at ${Math.round(weakestDay[1].present / weakestDay[1].total * 100)}%.` : 'Mark a few days to unlock attendance patterns.';
+
+    container.innerHTML = `
+      <div class="smart-insight"><strong>Safe-bunk estimate</strong><span>${safeBunks} day${safeBunks === 1 ? '' : 's'} at or above ${Math.round(target * 100)}%</span></div>
+      <div class="smart-insight"><strong>Month forecast</strong><span>${projectedRate}% if you attend the remaining ${remainingWorkingDays} working day${remainingWorkingDays === 1 ? '' : 's'}</span></div>
+      <div class="smart-insight"><strong>Pattern insight</strong><span>${pattern}</span></div>`;
+}
+
+async function persistAttendanceRecord(dateKey, record) {
+    attendanceData[dateKey] = record;
+    renderCurrentMonth();
+    if (!auth.currentUser) return;
+    const ref = doc(db, 'users', auth.currentUser.uid);
+    try {
+        await updateDoc(ref, { [`attendance.${dateKey}`]: record });
+    } catch (error) {
+        await setDoc(ref, { attendance: { [dateKey]: record } }, { merge: true });
+    }
+}
+
+async function fetchHolidaySuggestions() {
+    const container = document.getElementById('holiday-recommendations');
+    const country = document.getElementById('holiday-country')?.value || 'IN';
+    if (!container) return;
+    container.hidden = false;
+    container.innerHTML = '<p class="smart-loading">Finding public holidays...</p>';
+    try {
+        const year = new Date().getFullYear();
+        const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/${country}`);
+        if (!response.ok) throw new Error('Holiday service unavailable');
+        const holidays = await response.json();
+        const suggestions = holidays.filter(holiday => !attendanceData[holiday.date]);
+        if (!suggestions.length) {
+            container.innerHTML = '<p class="smart-empty">No new public holidays found for this year.</p>';
+            return;
+        }
+        container.innerHTML = `<div class="smart-results-title">Recommendations for ${year}</div>` + suggestions.map(holiday => `
+          <div class="recommendation-row"><span><strong>${holiday.date}</strong> ${holiday.localName || holiday.name}</span><button class="btn-add-holiday" data-date="${holiday.date}" data-title="${(holiday.localName || holiday.name).replace(/"/g, '&quot;')}">Add</button></div>`).join('');
+        container.querySelectorAll('.btn-add-holiday').forEach(button => button.addEventListener('click', async () => {
+            const dateKey = button.dataset.date;
+            await persistAttendanceRecord(dateKey, { date: `${dateKey}T00:00:00.000Z`, status: 'holiday', title: button.dataset.title || 'Public holiday' });
+            button.textContent = 'Added';
+            button.disabled = true;
+        }));
+    } catch (error) {
+        container.innerHTML = '<p class="smart-empty">Holiday suggestions are unavailable right now. You can still upload your college calendar.</p>';
+    }
+}
+
+function detectLocation() {
+    if (!navigator.geolocation) {
+        showToast('Location detection is unavailable. Enter your location manually.', 'warning');
+        return;
+    }
+    navigator.geolocation.getCurrentPosition(async position => {
+        try {
+            const { latitude, longitude } = position.coords;
+            const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+            if (!response.ok) throw new Error('Location lookup failed');
+            const location = await response.json();
+            const fields = {
+                'holiday-state': location.principalSubdivision,
+                'holiday-city': location.city || location.locality,
+                'holiday-district': location.localityInfo?.administrative?.[2]?.name || location.locality
+            };
+            const settingKeys = {
+                'holiday-state': 'holidayState',
+                'holiday-city': 'holidayCity',
+                'holiday-district': 'holidayDistrict'
+            };
+            for (const [id, value] of Object.entries(fields)) {
+                const field = document.getElementById(id);
+                if (field && value) {
+                    field.value = value;
+                    await saveSetting(settingKeys[id], value);
+                }
+            }
+            const country = document.getElementById('holiday-country');
+            if (country && location.countryCode) {
+                country.value = location.countryCode;
+                await saveSetting('holidayCountry', location.countryCode);
+            }
+            showToast('📍 Location filled. Review it before fetching holidays.', 'success');
+        } catch (error) {
+            showToast('Could not identify that location. Enter it manually.', 'warning');
+        }
+    }, () => showToast('Location permission was not granted. You can enter it manually.', 'warning'), { timeout: 10000 });
+}
+
+function parseCollegeCalendar(text, fileName) {
+    if (fileName.toLowerCase().endsWith('.json')) {
+        const parsed = JSON.parse(text);
+        return Array.isArray(parsed) ? parsed : parsed.holidays || [];
+    }
+    const lines = text.split(/\r?\n/).filter(Boolean);
+    const start = /date/i.test(lines[0]) ? 1 : 0;
+    return lines.slice(start).map(line => {
+        const [dateKey, ...titleParts] = line.split(',');
+        return { date: dateKey.trim(), title: titleParts.join(',').trim() || 'College holiday' };
+    });
+}
+
+async function handleCollegeCalendarUpload(event) {
+    const file = event.target.files?.[0];
+    const preview = document.getElementById('college-calendar-preview');
+    if (!file || !preview) return;
+    try {
+        const entries = parseCollegeCalendar(await file.text(), file.name)
+            .map(entry => ({ date: String(entry.date || '').slice(0, 10), title: entry.title || entry.name || 'College holiday' }))
+            .filter(entry => /^\d{4}-\d{2}-\d{2}$/.test(entry.date));
+        preview.hidden = false;
+        preview.innerHTML = `<div class="smart-results-title">${entries.length} holiday${entries.length === 1 ? '' : 's'} ready to import</div><button id="import-college-holidays" class="btn-save-inline">Import Calendar</button>`;
+        document.getElementById('import-college-holidays')?.addEventListener('click', async () => {
+            for (const entry of entries) await persistAttendanceRecord(entry.date, { date: `${entry.date}T00:00:00.000Z`, status: 'holiday', title: entry.title });
+            await saveSetting('collegeHolidays', entries);
+            preview.innerHTML = '<p class="smart-empty">College calendar imported.</p>';
+        });
+    } catch (error) {
+        preview.hidden = false;
+        preview.innerHTML = '<p class="smart-empty">Could not read this file. Use CSV columns date,title or a JSON array.</p>';
+    }
+}
+
+async function requestReminderPermission() {
+    if (!('Notification' in window)) {
+        showToast('This browser does not support notifications.', 'warning');
+        return;
+    }
+    const permission = await Notification.requestPermission();
+    updateNotificationStatus();
+    if (permission === 'granted') {
+        await saveSetting('smartReminders', true);
+        const toggle = document.getElementById('smart-reminders');
+        if (toggle) toggle.checked = true;
+        scheduleSmartReminder(true);
+        showToast('🔔 Smart reminders enabled.', 'success');
+    }
+}
+
+function updateNotificationStatus() {
+    const status = document.getElementById('notification-status');
+    if (status && 'Notification' in window) status.textContent = `Browser permission: ${Notification.permission}`;
+}
+
+let reminderTimer;
+function scheduleSmartReminder(enabled) {
+    clearTimeout(reminderTimer);
+    if (!enabled || !('Notification' in window) || Notification.permission !== 'granted') return;
+    const reminderTime = document.getElementById('reminder-time')?.value || '20:00';
+    const [hours, minutes] = reminderTime.split(':').map(Number);
+    const next = new Date();
+    next.setHours(hours, minutes, 0, 0);
+    if (next <= new Date()) next.setDate(next.getDate() + 1);
+    reminderTimer = setTimeout(() => {
+        const todayKey = formatDate(new Date());
+        if (!attendanceData[todayKey] && isWorkingDay(new Date())) new Notification('Bunk Smart', { body: 'Today\'s attendance is still unmarked.' });
+        scheduleSmartReminder(true);
+    }, next.getTime() - Date.now());
 }
 
 async function saveSetting(key, value) {
@@ -1155,6 +1424,17 @@ async function saveSetting(key, value) {
         }
     } catch (error) {
         console.error('Error saving setting:', error);
+    }
+}
+
+function handleTwoFactorToggle(enabled) {
+    const toggle = document.getElementById('two-factor');
+    if (enabled) {
+        if (toggle) toggle.checked = false;
+        saveSetting('twoFactor', false);
+        showToast('Two-factor enrollment needs a Firebase Auth setup flow first.', 'info', 3500);
+    } else {
+        showToast('Two-factor preference disabled.', 'info', 2000);
     }
 }
 
@@ -1176,6 +1456,63 @@ function applyTheme(theme) {
 
     // Persist preference immediately to localStorage for fast re-apply on reload
     localStorage.setItem('bunkSmartTheme', theme);
+}
+
+function formatUserDate(date, options) {
+    return new Intl.DateTimeFormat(userSettings.language || 'en', {
+        timeZone: userSettings.timezone || 'Asia/Kolkata',
+        ...options
+    }).format(date);
+}
+
+function applyLanguage(language = 'en') {
+    userSettings.language = language;
+    document.documentElement.lang = language;
+    const translations = {
+        en: { attendance: 'Attendance', insights: 'Insights', challenges: 'Challenges', settings: 'Settings', dashboard: 'Attendance Dashboard', insightTitle: 'Attendance Insights', present: 'Present Days', bunk: 'Bunk Days', streak: 'Day Streak' },
+        hi: { attendance: 'उपस्थिति', insights: 'विश्लेषण', challenges: 'चुनौतियां', settings: 'सेटिंग्स', dashboard: 'उपस्थिति डैशबोर्ड', insightTitle: 'उपस्थिति विश्लेषण', present: 'उपस्थित दिन', bunk: 'बंक दिन', streak: 'लगातार दिन' },
+        es: { attendance: 'Asistencia', insights: 'Análisis', challenges: 'Retos', settings: 'Ajustes', dashboard: 'Panel de asistencia', insightTitle: 'Análisis de asistencia', present: 'Días presentes', bunk: 'Días ausentes', streak: 'Racha' },
+        fr: { attendance: 'Présence', insights: 'Analyses', challenges: 'Défis', settings: 'Paramètres', dashboard: 'Tableau de présence', insightTitle: 'Analyses de présence', present: 'Jours présents', bunk: 'Jours absents', streak: 'Série' },
+        de: { attendance: 'Anwesenheit', insights: 'Analysen', challenges: 'Herausforderungen', settings: 'Einstellungen', dashboard: 'Anwesenheitsübersicht', insightTitle: 'Anwesenheitsanalysen', present: 'Anwesende Tage', bunk: 'Fehltage', streak: 'Serie' }
+    };
+    const text = translations[language] || translations.en;
+    const setText = (selector, value) => document.querySelectorAll(selector).forEach(element => { element.textContent = value; });
+    setText('.nav-item[data-section="attendance"] .nav-text', text.attendance);
+    setText('.nav-item[data-section="insights"] .nav-text', text.insights);
+    setText('.nav-item[data-section="challenges"] .nav-text', text.challenges);
+    setText('.nav-item[data-section="settings"] .nav-text', text.settings);
+    setText('#attendance-section h1', text.dashboard);
+    setText('#insights-section h1', text.insightTitle);
+    setText('#present-days + .stat-label', text.present);
+    setText('#bunk-days + .stat-label', text.bunk);
+    setText('#streak + .stat-label', text.streak);
+    if (calendarGrid) renderCalendar();
+}
+
+function scheduleSessionTimeout(minutes) {
+    clearTimeout(sessionTimer);
+    const timeoutMinutes = Number(minutes);
+    if (!timeoutMinutes) return;
+    const resetTimer = () => {
+        clearTimeout(sessionTimer);
+        sessionTimer = setTimeout(() => import('./guard.js').then(module => module.logoutUser()), timeoutMinutes * 60 * 1000);
+    };
+    if (!scheduleSessionTimeout.bound) {
+        ['click', 'keydown', 'mousemove', 'touchstart'].forEach(event => document.addEventListener(event, resetTimer, { passive: true }));
+        scheduleSessionTimeout.bound = true;
+    }
+    resetTimer();
+}
+
+function scheduleAutoBackup(enabled = true) {
+    if (!enabled || !auth.currentUser) return;
+    const frequency = document.getElementById('backup-frequency')?.value || userSettings.backupFrequency || 'weekly';
+    const interval = frequency === 'daily' ? 86400000 : frequency === 'monthly' ? 2592000000 : 604800000;
+    localStorage.setItem(`bunkSmartBackup_${auth.currentUser.uid}`, JSON.stringify({
+        savedAt: new Date().toISOString(), attendance: attendanceData, challenges: challengesData, settings: userSettings
+    }));
+    clearTimeout(scheduleAutoBackup.timer);
+    scheduleAutoBackup.timer = setTimeout(() => scheduleAutoBackup(true), interval);
 }
 
 // Apply saved theme immediately on load (before Firebase)

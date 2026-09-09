@@ -451,9 +451,17 @@
       </div>
 
       <div class="settings-container">
+        <nav class="settings-jumpbar" aria-label="Settings sections">
+          <a href="#profile-settings">Profile</a>
+          <a href="#app-settings">Appearance</a>
+          <a href="#attendance-settings">Attendance</a>
+          <a href="#smart-settings">Smart tools</a>
+          <a href="#privacy-settings">Privacy</a>
+          <a href="#data-settings">Data</a>
+        </nav>
 
         <!-- Profile Settings -->
-        <div class="settings-group">
+        <div class="settings-group" id="profile-settings">
           <div class="settings-group-header">
             <span class="settings-group-icon">👤</span>
             <h3>Profile Settings</h3>
@@ -502,7 +510,7 @@
         </div>
 
         <!-- App Preferences -->
-        <div class="settings-group">
+        <div class="settings-group" id="app-settings">
           <div class="settings-group-header">
             <span class="settings-group-icon">🎨</span>
             <h3>App Preferences</h3>
@@ -569,7 +577,7 @@
         </div>
 
         <!-- Attendance Settings -->
-        <div class="settings-group">
+        <div class="settings-group" id="attendance-settings">
           <div class="settings-group-header">
             <span class="settings-group-icon">📅</span>
             <h3>Attendance Settings</h3>
@@ -626,7 +634,85 @@
         </div>
 
         <!-- Privacy & Security -->
-        <div class="settings-group">
+        <!-- Smart Automation -->
+        <div class="settings-group smart-settings-group" id="smart-settings">
+          <div class="settings-group-header">
+            <span class="settings-group-icon">🧠</span>
+            <div>
+              <h3>Smart Automation</h3>
+              <p class="settings-group-subtitle">Optional tools that reduce daily work. You stay in control.</p>
+            </div>
+          </div>
+          <div class="settings-body">
+            <div class="setting-item">
+              <div class="setting-info">
+                <label>Location & institution</label>
+                <span class="setting-hint">Used only to suggest public holidays. City and district are optional.</span>
+              </div>
+              <div class="smart-location-grid">
+                <select id="holiday-country" aria-label="Holiday country">
+                  <option value="IN">India</option>
+                  <option value="US">United States</option>
+                  <option value="GB">United Kingdom</option>
+                  <option value="AU">Australia</option>
+                </select>
+                <input type="text" id="holiday-state" placeholder="State (e.g. Maharashtra)">
+                <input type="text" id="holiday-city" placeholder="City (optional)">
+                <input type="text" id="holiday-district" placeholder="District (optional)">
+                <input type="text" id="institution-name" placeholder="College or school name (optional)">
+                <button id="detect-location" class="btn-save-inline" type="button">Detect my location</button>
+              </div>
+            </div>
+            <div class="setting-item toggle-setting">
+              <div class="setting-info">
+                <label for="holiday-suggestions">Holiday suggestions</label>
+                <span class="setting-hint">Show official public holidays as recommendations, never mark them automatically.</span>
+              </div>
+              <label class="toggle-switch"><input type="checkbox" id="holiday-suggestions" checked><span class="toggle-track"></span></label>
+            </div>
+            <div class="setting-item smart-action-row">
+              <div class="setting-info">
+                <label>Public holiday calendar</label>
+                <span class="setting-hint">Fetches the selected country's public holidays. Review each one before adding.</span>
+              </div>
+              <button id="fetch-holidays" class="btn-save-inline">Find Holidays</button>
+            </div>
+            <div id="holiday-recommendations" class="smart-results" hidden></div>
+            <div class="setting-item smart-action-row">
+              <div class="setting-info">
+                <label for="college-calendar-file">College calendar</label>
+                <span class="setting-hint">Upload CSV or JSON with date and title columns for institution-specific closures.</span>
+              </div>
+              <input type="file" id="college-calendar-file" accept=".csv,.json,text/csv,application/json">
+            </div>
+            <div id="college-calendar-preview" class="smart-results" hidden></div>
+            <div class="setting-item toggle-setting">
+              <div class="setting-info">
+                <label for="smart-reminders">Smart reminders</label>
+                <span class="setting-hint">Remind you when today's attendance is still unmarked. Browser permission is required.</span>
+              </div>
+              <label class="toggle-switch"><input type="checkbox" id="smart-reminders"><span class="toggle-track"></span></label>
+            </div>
+            <div class="setting-item smart-action-row">
+              <div class="setting-info">
+                <label>Reminder permission</label>
+                <span class="setting-hint" id="notification-status">Not requested</span>
+              </div>
+              <button id="enable-reminders" class="btn-save-inline">Enable</button>
+            </div>
+            <div class="setting-item inline-setting">
+              <div class="setting-info">
+                <label for="smart-target">Target attendance (%)</label>
+                <span class="setting-hint">Used for safe-bunk predictions.</span>
+              </div>
+              <div class="setting-control"><input type="number" id="smart-target" min="1" max="100" value="75" style="width:90px"></div>
+            </div>
+            <div id="smart-insights" class="smart-insights" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <!-- Privacy & Security -->
+        <div class="settings-group" id="privacy-settings">
           <div class="settings-group-header">
             <span class="settings-group-icon">🔒</span>
             <h3>Privacy & Security</h3>
@@ -671,7 +757,7 @@
         </div>
 
         <!-- Data Management -->
-        <div class="settings-group">
+        <div class="settings-group" id="data-settings">
           <div class="settings-group-header">
             <span class="settings-group-icon">💾</span>
             <h3>Data Management</h3>
@@ -792,6 +878,7 @@
         <input type="text" id="holiday-title" placeholder="e.g., Onam Holiday or College Protest">
       </div>
 
+      <button id="clear-attendance" class="btn-clear-attendance" type="button">Clear this date</button>
       <button id="save-attendance" class="btn-primary">Save Attendance</button>
     </div>
   </div>

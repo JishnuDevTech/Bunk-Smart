@@ -1,7 +1,7 @@
 from datetime import date
 import unittest
 
-from attendance_engine import monthly_metrics, monthly_trend, validate_record
+from attendance_engine import monthly_metrics, monthly_trend, safe_bunks, validate_record, weekday_patterns
 
 
 class AttendanceEngineTests(unittest.TestCase):
@@ -21,6 +21,10 @@ class AttendanceEngineTests(unittest.TestCase):
     def test_future_records_are_rejected(self):
         with self.assertRaises(ValueError):
             validate_record("2026-09-10", {"status": "present"}, today=date(2026, 9, 9))
+
+    def test_smart_recommendations(self):
+        self.assertEqual(safe_bunks(self.records, 2026, 9, target=50), 1)
+        self.assertEqual(weekday_patterns(self.records)[0]["rate"], 0)
 
 
 if __name__ == "__main__":

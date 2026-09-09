@@ -8,7 +8,7 @@ Records use the same shape as the frontend: {date, status, title, ...}.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 ATTENDANCE_STATUSES = {"present", "bunked", "holiday"}
@@ -66,6 +66,31 @@ def monthly_trend(records: Mapping[str, Mapping[str, Any]]) -> list[dict[str, in
         metrics = monthly_metrics(records, year, month)
         trend.append({"month": month_key, "present": metrics["rate"], "bunked": round(metrics["bunked"] / (metrics["present"] + metrics["bunked"]) * 100) if metrics["present"] + metrics["bunked"] else 0})
     return trend
+
+
+def safe_bunks(records: Mapping[str, Mapping[str, Any]], year: int, month: int, target: int = 75) -> int:
+    """Return additional bunk days possible while staying at the target rate."""
+    metrics = monthly_metrics(records, year, month)
+    if not metrics["present"] or not 1 <= target <= 100:
+        return 0
+    return max(0, int(metrics["present"] / (target / 100) - metrics["present"] - metrics["bunked"]))
+
+
+def weekday_patterns(records: Mapping[str, Mapping[str, Any]]) -> list[dict[str, int | str]]:
+    """Return attendance rates grouped by weekday, lowest rate first."""
+    totals: dict[int, list[int]] = {}
+    for date_key, record in records.items():
+        if record.get("status") not in {"present", "bunked"}:
+            continue
+        weekday = _record_date(date_key, record).weekday()
+        if weekday not in totals:
+            totals[weekday] = [0, 0]
+        totals[weekday][1] += 1
+        totals[weekday][0] += record.get("status") == "present"
+    return [
+        {"weekday": date(2024, 1, 1) + timedelta(days=weekday), "rate": round(present / total * 100), "total": total}
+        for weekday, (present, total) in sorted(totals.items(), key=lambda item: item[1][0] / item[1][1])
+    ]
 
 
 def simulate(records: Iterable[tuple[str, str]], today: date | None = None) -> dict[str, dict[str, Any]]:
