@@ -267,13 +267,14 @@ function setupModal() {
     });
 
     markBunkBtn?.addEventListener('click', () => {
-        // Bunk: show the detail fields + save button
+        // Bunk: save immediately, just like Present
         markBunkBtn.classList.add('selected');
         markPresentBtn.classList.remove('selected');
         markHolidayBtn?.classList.remove('selected');
         if (holidayDetails) holidayDetails.hidden = true;
-        bunkDetails.hidden = false;
-        if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
+        bunkDetails.hidden = true;
+        if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
+        saveAttendanceImmediate('bunked');
     });
 
     markHolidayBtn?.addEventListener('click', () => {
@@ -308,7 +309,7 @@ function openAttendanceModal(date) {
     if (bunkActivityInput) bunkActivityInput.value = '';
     if (bunkMissedInput) bunkMissedInput.value = '';
     if (holidayTitleInput) holidayTitleInput.value = '';
-    // Save button hidden by default — only shown when Bunk is selected
+    // Save button is only needed for a holiday title.
     if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
 
     if (existing) {
@@ -318,10 +319,10 @@ function openAttendanceModal(date) {
             if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
         } else if (existing.status === 'bunked') {
             markBunkBtn.classList.add('selected');
-            bunkDetails.hidden = false;
+            bunkDetails.hidden = true;
             if (bunkActivityInput) bunkActivityInput.value = existing.activity || '';
             if (bunkMissedInput) bunkMissedInput.value = existing.missed || '';
-            if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
+            if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
         } else if (existing.status === 'holiday') {
             markHolidayBtn?.classList.add('selected');
             if (holidayDetails) holidayDetails.hidden = false;
@@ -358,7 +359,8 @@ async function saveAttendanceImmediate(status) {
     // Optimistic update
     attendanceData[dateKey] = record;
     renderCurrentMonth();
-    showToast(`✅ Present marked for ${dateKey}`, 'success');
+    const statusLabel = status === 'present' ? '✅ Present' : '❌ Bunked';
+    showToast(`${statusLabel} marked for ${dateKey}`, status === 'present' ? 'success' : 'info');
 
     try {
         const ref = doc(db, 'users', auth.currentUser.uid);
