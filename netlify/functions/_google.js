@@ -17,7 +17,12 @@ export function oauthClient() {
 }
 
 export function cookieValue(cookieHeader, name) {
-  return (cookieHeader || '').split(';').map(part => part.trim()).find(part => part.startsWith(`${name}=`))?.slice(name.length + 1);
+  const value = typeof cookieHeader?.get === 'function'
+    ? cookieHeader.get('cookie')
+    : typeof cookieHeader === 'object'
+      ? cookieHeader.cookie || cookieHeader.Cookie
+      : cookieHeader;
+  return (value || '').split(';').map(part => part.trim()).find(part => part.startsWith(`${name}=`))?.slice(name.length + 1);
 }
 
 function key() {
@@ -54,7 +59,26 @@ export function expiredCookie(name) {
 }
 
 export function response(statusCode, body, headers = {}) {
-  return { statusCode, headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) };
+  const responseHeaders = new Headers({ 'content-type': 'application/json' });
+  for (const [name, value] of Object.entries(headers)) {
+    if (Array.isArray(value)) value.forEach(item => responseHeaders.append(name, item));
+    else responseHeaders.set(name, value);
+  }
+  return new Response(JSON.stringify(body), { status: statusCode, headers: responseHeaders });
+}
+
+export function redirect(url, headers = {}) {
+  return response(302, null, { Location: url, ...headers });
+}
+
+export function requestUrl(event) {
+  if (event instanceof Request) return new URL(event.url);
+  return new URL(event.rawUrl || `http://localhost${event.path || '/'}`);
+}
+
+export function requestHeaders(event) {
+  if (event instanceof Request) return event.headers;
+  return event.headers || {};
 }
 
 export { frontendUrl, redirectUri };

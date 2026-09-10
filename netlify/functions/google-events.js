@@ -1,7 +1,7 @@
-import { cookieValue, oauthClient, unseal, response } from './_google.js';
+import { cookieValue, oauthClient, unseal, response, requestHeaders } from './_google.js';
 
 export default async function handler(event) {
-  const tokens = unseal(cookieValue(event.headers.cookie, 'bunk_google_tokens'));
+  const tokens = unseal(cookieValue(requestHeaders(event), 'bunk_google_tokens'));
   if (!tokens) return response(401, { error: 'Google Calendar is not connected' });
   try {
     const client = oauthClient();

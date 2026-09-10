@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { oauthClient, seal, cookie, response } from './_google.js';
+import { oauthClient, seal, cookie, redirect, response } from './_google.js';
 
 export default async function handler() {
   try {
@@ -11,7 +11,7 @@ export default async function handler() {
       scope: ['https://www.googleapis.com/auth/calendar.readonly'],
       state
     });
-    return { statusCode: 302, headers: { Location: url, 'Set-Cookie': cookie('bunk_google_state', seal(state), 600) }, body: '' };
+    return redirect(url, { 'Set-Cookie': cookie('bunk_google_state', seal(state), 600) });
   } catch (error) {
     return response(500, { error: error.message });
   }
