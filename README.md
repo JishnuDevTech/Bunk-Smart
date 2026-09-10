@@ -43,7 +43,7 @@ It’s **student decision intelligence**.
 
 ## Demo
 Check out the live project:  
-[Bunk Smart Live Demo](https://bunk-smart.netlify.app/)
+[Bunk Smart Live Demo](https://bunk-smart.vercel.app/)
 
 *(Login required due to Firebase authentication)*
 
