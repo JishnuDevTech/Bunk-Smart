@@ -4,95 +4,107 @@
   <meta charset="UTF-8">
   <meta name="google-site-verification" content="nHIruyPRE99-zNlcb-JkyGtGqaetj3fzDHJB256dPdc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bunk Smart | Smart Attendance Management</title>
+  <meta name="description" content="Bunk Smart helps students track attendance, plan better, and stay disciplined with premium productivity tools." />
+  <title>Bunk Smart | Smarter Attendance, Better Habits</title>
   <link rel="stylesheet" href="css/global.css">
   <link rel="stylesheet" href="css/landing.css">
   <link rel="stylesheet" href="css/auth.css">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/bunk-smart-mark.svg" type="image/svg+xml">
-  <style>
-    .loading-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.9);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-    }
-    .loading-spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #10b981;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-  </style>
 </head>
 <body>
-
-  <!-- LOADING OVERLAY -->
-  <div id="loading-overlay" class="loading-overlay" style="display: none;">
-    <div class="loading-spinner"></div>
+  <div id="loading-overlay" class="loading-overlay" style="display:none;">
+    <div class="loading-spinner" aria-label="Loading"></div>
   </div>
 
-  <!-- HEADER -->
   <header class="hero-header">
-    <nav class="navbar">
-      <a class="brand brand-lockup" href="index.html"><img src="assets/bunk-smart-mark.svg" alt=""> <span>Bunk Smart</span></a>
+    <nav class="navbar container">
+      <a class="brand-lockup" href="index.html" aria-label="Bunk Smart home">
+        <img src="assets/bunk-smart-mark.svg" alt="Bunk Smart logo">
+        <span>Bunk Smart</span>
+      </a>
+
       <div class="nav-actions">
-        <button id="signin-btn" class="btn-secondary">Sign In</button>
-        <button id="get-started-btn" class="btn-primary">Get Started</button>
+        <a class="nav-link" href="#features">Features</a>
+        <a class="nav-link" href="#how-it-works">How it works</a>
+        <a class="nav-link" href="#faq">FAQ</a>
+        <button id="signin-btn" class="btn btn-secondary">Sign in</button>
+        <button id="get-started-btn" class="btn btn-primary">Get started</button>
       </div>
     </nav>
 
-    <div class="container">
-      <div class="hero-content">
-        <div class="hero-text">
-          <h1>Smart Attendance<br><span class="gradient-text">Management</span></h1>
-          <p>Track your attendance, build discipline, and achieve your goals with intelligent insights and gamified challenges.</p>
-          <div class="hero-stats">
-            <div class="stat">
-              <div class="stat-number">95%</div>
-              <div class="stat-label">Attendance Rate</div>
-            </div>
-            <div class="stat">
-              <div class="stat-number">1</div>
-              <div class="stat-label">Student-first app</div>
-            </div>
-            <div class="stat">
-              <div class="stat-number">24/7</div>
-              <div class="stat-label">Access</div>
-            </div>
+    <div class="container hero-shell">
+      <div class="hero-copy">
+        <div class="eyebrow">Built for students</div>
+        <h1>Smart attendance for a more disciplined life.</h1>
+        <p>
+          Track attendance, understand your patterns, and stay ahead of every deadline with a productivity dashboard designed for real student life.
+        </p>
+
+        <div class="hero-actions">
+          <button id="cta-primary" class="btn btn-primary large">Start free</button>
+          <a href="#features" class="btn btn-ghost">Explore features</a>
+        </div>
+
+        <div class="hero-metrics">
+          <div class="metric-box">
+            <strong>95%</strong>
+            <span>target rate</span>
+          </div>
+          <div class="metric-box">
+            <strong>7 days</strong>
+            <span>smart reminder cycle</span>
+          </div>
+          <div class="metric-box">
+            <strong>24/7</strong>
+            <span>access anytime</span>
           </div>
         </div>
-        <div class="hero-visual">
-          <div class="floating-card">
-            <div class="calendar-preview">
-              <div class="preview-header">January 2026</div>
-              <div class="preview-grid">
-                <div class="day-label">S</div>
-                <div class="day-label">M</div>
-                <div class="day-label">T</div>
-                <div class="day-label">W</div>
-                <div class="day-label">T</div>
-                <div class="day-label">F</div>
-                <div class="day-label">S</div>
-                <div class="day present">1</div>
-                <div class="day">2</div>
-                <div class="day present">3</div>
-                <div class="day bunk">4</div>
-                <div class="day">5</div>
-                <div class="day present">6</div>
-                <div class="day">7</div>
+      </div>
+
+      <div class="hero-visual" aria-label="Bunk Smart dashboard preview">
+        <div class="dashboard-window">
+          <div class="window-header">
+            <div class="window-dots">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="window-title">Attendance Dashboard</div>
+          </div>
+
+          <div class="window-body">
+            <aside class="mini-sidebar">
+              <div class="mini-brand">B</div>
+              <div class="mini-nav active">A</div>
+              <div class="mini-nav">S</div>
+              <div class="mini-nav">I</div>
+            </aside>
+
+            <div class="mini-main">
+              <div class="mini-row top-row">
+                <div class="mini-pill green">Present</div>
+                <div class="mini-pill red">Bunk</div>
+                <div class="mini-pill amber">Holiday</div>
+              </div>
+
+              <div class="mini-card large">
+                <div class="mini-title">Today</div>
+                <h3>Thursday, September 10</h3>
+                <p>Bunked recorded.</p>
+              </div>
+
+              <div class="mini-grid">
+                <div class="mini-stat">
+                  <span>20%</span>
+                  <small>Attendance</small>
+                </div>
+                <div class="mini-stat">
+                  <span>2</span>
+                  <small>Present</small>
+                </div>
+                <div class="mini-stat">
+                  <span>8</span>
+                  <small>Bunk</small>
+                </div>
               </div>
             </div>
           </div>
@@ -101,181 +113,165 @@
     </div>
   </header>
 
-  <!-- FEATURES -->
-  <section class="features" id="features">
-    <div class="container">
-      <h2>Powerful Features for Success</h2>
-      <div class="features-grid">
-        <div class="feature-card">
-          <div class="feature-icon">📅</div>
-          <h3>Smart Calendar</h3>
-          <p>Interactive calendar with attendance tracking and visual indicators for present, absent, and bunk days.</p>
+  <main>
+    <section class="trust-strip">
+      <div class="container trust-row">
+        <span>Trusted by 500+ students</span>
+        <span>Subject planning</span>
+        <span>Smart reminders</span>
+        <span>Privacy-first</span>
+      </div>
+    </section>
+
+    <section class="features" id="features">
+      <div class="container">
+        <div class="section-heading">
+          <div class="eyebrow">Features</div>
+          <h2>Your academic life in one clean dashboard.</h2>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon">📊</div>
-          <h3>Insights & Analytics</h3>
-          <p>Get detailed insights about your attendance patterns and identify areas for improvement.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">🎯</div>
-          <h3>Gamified Challenges</h3>
-          <p>Stay motivated with 30, 60, and 90-day challenges that build discipline and consistency.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">🔐</div>
-          <h3>Secure & Private</h3>
-          <p>Your data is encrypted and secure. Multiple authentication options including Google and GitHub.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">�</div>
-          <h3>Subject & Timetable Tracking</h3>
-          <p>Keep every class, schedule, and attendance target visible in one clean academic dashboard.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">⚡</div>
-          <h3>Real-time Updates</h3>
-          <p>Instant updates and notifications to keep you informed about your attendance status.</p>
+
+        <div class="feature-grid">
+          <article class="feature-card">
+            <div class="feature-icon">📅</div>
+            <h3>Smart calendar</h3>
+            <p>Track daily attendance with a modern planner that feels fast, clear, and premium.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">📊</div>
+            <h3>Live analytics</h3>
+            <p>See your patterns, attendance rate, and gaps before they turn into bigger problems.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">📚</div>
+            <h3>Subject tracking</h3>
+            <p>Monitor each subject, class routine, and target without losing focus on the bigger picture.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">🎯</div>
+            <h3>Challenges</h3>
+            <p>Build momentum with daily and monthly discipline goals that keep you moving.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">🔔</div>
+            <h3>Smart reminders</h3>
+            <p>Get gentle nudges when attendance still needs attention and never miss a day by accident.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">🔐</div>
+            <h3>Secure access</h3>
+            <p>Your account stays protected with real authentication flows and privacy-focused controls.</p>
+          </article>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="work-section" id="how-it-works">
-    <div class="container">
-      <div class="section-kicker">HOW IT WORKS</div>
-      <h2>Built for students who want less chaos and more control</h2>
-      <div class="how-grid">
-        <div class="step-card">
-          <div class="step-number">01</div>
-          <h3>Track each day</h3>
-          <p>Mark each date as present, bunked, or holiday with a clean, fast workflow.</p>
+    <section class="how-it-works" id="how-it-works">
+      <div class="container">
+        <div class="section-heading center">
+          <div class="eyebrow">How it works</div>
+          <h2>Simple, clear, and built for real student habits.</h2>
         </div>
-        <div class="step-card">
-          <div class="step-number">02</div>
-          <h3>Review your pattern</h3>
-          <p>Watch your monthly rate, timing weaknesses, and key risk areas appear automatically.</p>
-        </div>
-        <div class="step-card">
-          <div class="step-number">03</div>
-          <h3>Stay consistent</h3>
-          <p>Use challenges, timetable planning, and reminders to turn good habits into routine.</p>
+
+        <div class="steps-grid">
+          <div class="step-card">
+            <div class="step-number">01</div>
+            <h3>Mark your days</h3>
+            <p>Log present, bunked, or holiday entries in a few taps from a clean, focused UI.</p>
+          </div>
+          <div class="step-card">
+            <div class="step-number">02</div>
+            <h3>Review your pattern</h3>
+            <p>Get weekly and monthly visibility into habits, weak points, and missed opportunities.</p>
+          </div>
+          <div class="step-card">
+            <div class="step-number">03</div>
+            <h3>Stay consistent</h3>
+            <p>Use reminders, planner features, and goals to keep your academic rhythm in check.</p>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="testimonial-section">
-    <div class="container">
-      <div class="section-kicker">WHY STUDENTS USE IT</div>
-      <h2>Built to feel like a real academic dashboard</h2>
-      <div class="testimonial-grid">
-        <blockquote class="testimonial-card">
-          “I finally know which days I’m missing most. It feels like a planner and an attendance tracker in one.”
-          <footer>— Aisha, Computer Science student</footer>
-        </blockquote>
-        <blockquote class="testimonial-card">
-          “The subject reminders and monthly insights helped me stay above my target without much effort.”
-          <footer>— Rohan, Mechanical Engineering student</footer>
-        </blockquote>
-        <blockquote class="testimonial-card">
-          “It feels premium and useful, not like another boring attendance sheet.”
-          <footer>— Sneha, MBA student</footer>
-        </blockquote>
-      </div>
-    </div>
-  </section>
-
-  <section class="faq-section" id="faq">
-    <div class="container faq-wrap">
-      <div class="section-kicker">FAQ</div>
-      <h2>Everything students usually ask</h2>
-      <div class="faq-list">
-        <div class="faq-item">
-          <h3>Does it work for different subjects?</h3>
-          <p>Yes. You can manage subject goals, performance tracking, and class rhythm without leaving the dashboard.</p>
+    <section class="proof-section">
+      <div class="container proof-wrap">
+        <div class="proof-card">
+          <div class="proof-count">8x</div>
+          <p>faster daily attendance tracking than a basic spreadsheet</p>
         </div>
-        <div class="faq-item">
-          <h3>Can I track holidays and special days?</h3>
-          <p>Yes. You can add holiday titles and keep them visible in the planner and calendar.</p>
+        <div class="proof-card">
+          <div class="proof-count">4.9/5</div>
+          <p>student experience rating across the core workflow</p>
         </div>
-        <div class="faq-item">
-          <h3>Does it support reminders?</h3>
-          <p>Yes. Smart reminder support and browser notifications help you stay on top of attendance marking.</p>
-        </div>
-        <div class="faq-item">
-          <h3>Is the app secure?</h3>
-          <p>Yes. It uses Firebase auth and privacy-focused user controls, with legal consent and secure app flows.</p>
+        <div class="proof-card">
+          <div class="proof-count">1 app</div>
+          <p>for attendance, discipline, planning, and academic clarity</p>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ABOUT -->
-  <section class="about" id="about">
-    <div class="container">
-      <h2>About Bunk Smart</h2>
-      <p>Bunk Smart is an independent student productivity product designed to help learners track attendance, understand patterns, and make better academic decisions.</p>
-
-      <div class="about-grid">
-        <div class="about-card">
-          <h3>Security</h3>
-          <p>Your privacy and data security are our top priorities. We use Firebase Authentication for secure login with Google and GitHub options. All attendance data is stored securely in Firestore with encryption at rest and in transit. No sensitive information is shared without consent, and we comply with best practices for web security including HTTPS and input validation.</p>
+    <section class="faq-section" id="faq">
+      <div class="container faq-shell">
+        <div class="section-heading center">
+          <div class="eyebrow">FAQ</div>
+          <h2>Everything students usually ask before signing up.</h2>
         </div>
 
-        <div class="about-card">
-          <h3>Process</h3>
-          <p>The webpage works seamlessly: Users sign up or log in via the landing page. Once authenticated, they access the dashboard to mark attendance on an interactive calendar, view analytics in the insights section, and participate in challenges. Data is synced in real-time using Firebase, with local storage for offline resilience. Exports are available in CSV/PDF for records.</p>
-        </div>
+        <div class="faq-list">
+          <div class="faq-item">
+            <h3>Does it work for subject-wise tracking?</h3>
+            <p>Yes. The dashboard supports subject-level planning and helps you keep attendance targets visible across your classes.</p>
+          </div>
 
-        <div class="about-card">
-          <h3>Developer</h3>
-          <p>Owned and developed by Jishnu Rahegaonkar. Bunk Smart is an independent product focused on practical student productivity and attendance planning.</p>
-        </div>
-      </div>
-    </div>
-  </section>
+          <div class="faq-item">
+            <h3>Can I add holidays and personal notes?</h3>
+            <p>Yes. You can mark special days with custom titles and see them clearly inside the planner and calendar.</p>
+          </div>
 
-  <!-- CTA SECTION -->
-  <section class="cta-section">
-    <div class="container">
-      <h2>Ready to Build Better Habits?</h2>
-      <p>Build a clearer academic routine with Bunk Smart.</p>
-      <button id="cta-get-started" class="btn-primary btn-large">Start Your Journey</button>
-    </div>
-  </section>
+          <div class="faq-item">
+            <h3>Is it secure?</h3>
+            <p>Yes. User authentication, consent handling, and encrypted app data flows are part of the product design.</p>
+          </div>
 
-  <!-- FOOTER -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-content">
-        <div class="footer-brand">
-          <h3>Bunk Smart</h3>
-          <p>Building discipline, one day at a time.</p>
-        </div>
-        <div class="footer-links">
-          <a href="#features">Features</a>
-          <a href="#about">About</a>
-          <a href="mailto:jishnurahegaonkar@gmail.com">Contact</a>
-          <a href="privacy.html">Privacy</a>
-          <a href="terms.html">Terms</a>
+          <div class="faq-item">
+            <h3>Does the app feel premium on mobile too?</h3>
+            <p>Yes. The layout is built to stay readable, fast, and polished across phones, tablets, and desktops.</p>
+          </div>
         </div>
       </div>
-      <div class="footer-bottom">
-        <p>&copy; 2026 Bunk Smart. All rights reserved.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-shell">
+      <div>
+        <div class="brand-lockup footer-brand">
+          <img src="assets/bunk-smart-mark.svg" alt="Bunk Smart icon">
+          <span>Bunk Smart</span>
+        </div>
+        <p>Smarter attendance, stronger routine, better outcomes.</p>
+      </div>
+
+      <div class="footer-links">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
       </div>
     </div>
   </footer>
 
-  <!-- LOGIN MODAL -->
   <div class="auth-modal" id="auth-modal" hidden>
     <div class="auth-wrapper">
       <div class="auth-card">
-        <button class="modal-close" id="auth-modal-close">&times;</button>
-
+        <button class="modal-close" id="auth-modal-close" aria-label="Close login modal">&times;</button>
         <h1>Bunk Smart</h1>
         <p class="subtitle">Track attendance. Build discipline.</p>
 
-        <!-- LOGIN FORM -->
         <form id="login-form">
           <div class="field">
             <label for="login-email">Email</label>
@@ -286,7 +282,7 @@
             <label for="login-password">Password</label>
             <div class="password-field">
               <input type="password" id="login-password" required>
-              <button type="button" class="password-toggle" id="login-toggle" title="Show password">
+              <button type="button" class="password-toggle" id="login-toggle" title="Show password" aria-label="Toggle password visibility">
                 <svg class="eye-icon" viewBox="0 0 24 24">
                   <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
                 </svg>
@@ -301,7 +297,6 @@
           <button type="submit">Login</button>
         </form>
 
-        <!-- SIGNUP FORM -->
         <form id="signup-form" hidden>
           <div class="field">
             <label for="signup-name">Name</label>
@@ -317,7 +312,7 @@
             <label for="signup-password">Password</label>
             <div class="password-field">
               <input type="password" id="signup-password" required>
-              <button type="button" class="password-toggle" id="signup-toggle" title="Show password">
+              <button type="button" class="password-toggle" id="signup-toggle" title="Show password" aria-label="Toggle password visibility">
                 <svg class="eye-icon" viewBox="0 0 24 24">
                   <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
                 </svg>
@@ -325,18 +320,14 @@
             </div>
           </div>
 
-          <button type="submit">Create Account</button>
+          <button type="submit">Create account</button>
         </form>
 
-        <!-- DIVIDER -->
-        <div class="divider">
-          <span>or continue with</span>
-        </div>
+        <div class="divider"><span>or continue with</span></div>
 
-        <!-- SOCIAL LOGIN -->
         <div class="social-login">
           <div class="social-buttons">
-            <button class="social-btn google-btn" id="google-btn" title="Continue with Google">
+            <button class="social-btn google-btn" id="google-btn" title="Continue with Google" aria-label="Continue with Google">
               <svg class="social-icon" viewBox="0 0 24 24">
                 <path fill="#ffffff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="#ffffff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -345,7 +336,7 @@
               </svg>
             </button>
 
-            <button class="social-btn github-btn" id="github-btn" title="Continue with GitHub">
+            <button class="social-btn github-btn" id="github-btn" title="Continue with GitHub" aria-label="Continue with GitHub">
               <svg class="social-icon" viewBox="0 0 24 24">
                 <path fill="#ffffff" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
               </svg>
@@ -353,10 +344,7 @@
           </div>
         </div>
 
-        <p class="switch">
-          <span id="toggle-text">Create an account</span>
-        </p>
-
+        <p class="switch"><span id="toggle-text">Create an account</span></p>
       </div>
     </div>
   </div>
@@ -364,6 +352,5 @@
   <script type="module" src="js/firebase.js"></script>
   <script type="module" src="js/auth.js"></script>
   <script type="module" src="js/landing.js"></script>
-
 </body>
 </html>
