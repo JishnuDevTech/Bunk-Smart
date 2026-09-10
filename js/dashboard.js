@@ -3,6 +3,11 @@ import { auth, db } from './firebase.js';
 import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js';
 import { onAuthStateChanged, updateProfile } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js';
 
+const CALENDAR_API_BASE = localStorage.getItem('bunkSmartCalendarApi') || '/.netlify/functions';
+const calendarEndpoint = action => CALENDAR_API_BASE.includes('/.netlify/functions')
+    ? `${CALENDAR_API_BASE}/google-${action}`
+    : `${CALENDAR_API_BASE}/api/google/${action}`;
+
 // DOM Elements
 const userNameElement = document.getElementById('user-name');
 const userEmailElement = document.getElementById('user-email');
@@ -43,6 +48,9 @@ let currentDate = new Date();
 let selectedDate = null;
 let attendanceData = {};
 let challengesData = {};
+let subjectsData = {};
+let timetableData = [];
+let holidayForecastData = [];
 let currentUser = null;
 let userSettings = { language: 'en', timezone: 'Asia/Kolkata', sessionTimeout: '60', autoBackup: true, backupFrequency: 'weekly' };
 let sessionTimer;
@@ -94,6 +102,9 @@ function initDashboard() {
     setupCalendar();
     setupModal();
     setupSettings();
+    setupTodayCommand();
+    setupSubjects();
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
 function updateUserInfo(user) {
@@ -111,7 +122,7 @@ async function loadUserData() {
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
         if (!userDoc.exists()) {
             await setDoc(doc(db, 'users', auth.currentUser.uid), {
-                attendance: {}, challenges: {}, settings: {}
+                attendance: {}, challenges: {}, subjects: {}, timetable: [], settings: {}
             });
             attendanceData = {};
             challengesData = {};
@@ -119,18 +130,153 @@ async function loadUserData() {
             const data = userDoc.data();
             attendanceData = data.attendance || {};
             challengesData = data.challenges || {};
+            subjectsData = data.subjects || {};
+            timetableData = data.timetable || [];
         }
         updateStats();
         renderCalendar();
         loadInsights();
         renderChallenges();
         loadSettings();
-            renderSmartInsights();
+        renderSmartInsights();
+        renderTodayCommand();
+        renderSubjects();
+        renderTimetable();
+        renderHolidayForecast();
+        if (new URLSearchParams(window.location.search).get('calendar') === 'connected') syncGoogleCalendarEvents();
     } catch (error) {
         console.error('Error loading user data:', error);
         showToast('Error loading data. Please refresh.', 'error');
     } finally {
         hideLoading();
+    }
+}
+
+function setupTodayCommand() {
+    document.getElementById('today-present')?.addEventListener('click', () => markToday('present'));
+    document.getElementById('today-bunk')?.addEventListener('click', () => markToday('bunked'));
+    document.getElementById('today-holiday')?.addEventListener('click', () => {
+        const title = window.prompt('Holiday title', 'College holiday');
+        if (title) markToday('holiday', title);
+    });
+    document.getElementById('today-clear')?.addEventListener('click', () => clearToday());
+}
+
+function todayKey() { return formatDate(new Date()); }
+
+function renderTodayCommand() {
+    const date = new Date();
+    const record = attendanceData[todayKey()];
+    const dateElement = document.getElementById('today-date');
+    const statusElement = document.getElementById('today-status');
+    if (dateElement) dateElement.textContent = formatUserDate(date, { weekday: 'long', month: 'long', day: 'numeric' });
+    if (statusElement) statusElement.textContent = record ? `${record.status === 'holiday' ? 'Holiday: ' + record.title : record.status[0].toUpperCase() + record.status.slice(1)} recorded.` : 'Your attendance status is unmarked.';
+    document.querySelectorAll('.today-actions button').forEach(button => { button.disabled = false; });
+}
+
+async function markToday(status, title = '') {
+    const key = todayKey();
+    const record = { date: `${key}T00:00:00.000Z`, status };
+    if (status === 'holiday') record.title = title || 'Holiday';
+    await persistAttendanceRecord(key, record);
+    renderTodayCommand();
+}
+
+async function clearToday() {
+    selectedDate = new Date();
+    await clearAttendance();
+    renderTodayCommand();
+}
+
+function setupSubjects() {
+    document.getElementById('add-subject')?.addEventListener('click', async () => {
+        const name = window.prompt('Subject name');
+        if (!name?.trim()) return;
+        const target = Number(window.prompt('Required attendance percentage', '75')) || 75;
+        const id = `subject_${Date.now()}`;
+        subjectsData[id] = { name: name.trim(), target: Math.min(100, Math.max(1, target)), present: 0, total: 0 };
+        await saveProductData('subjects', subjectsData);
+        renderSubjects();
+    });
+    document.getElementById('add-class')?.addEventListener('click', async () => {
+        const subject = window.prompt('Subject name for this class');
+        if (!subject?.trim()) return;
+        const day = window.prompt('Day (Monday-Sunday)', 'Monday');
+        const time = window.prompt('Time (e.g. 09:00)', '09:00');
+        timetableData.push({ id: `class_${Date.now()}`, subject: subject.trim(), day: day || 'Monday', time: time || '09:00' });
+        await saveProductData('timetable', timetableData);
+        renderTimetable();
+    });
+}
+
+async function saveProductData(key, value) {
+    if (!auth.currentUser) return;
+    try { await updateDoc(doc(db, 'users', auth.currentUser.uid), { [key]: value }); }
+    catch { await setDoc(doc(db, 'users', auth.currentUser.uid), { [key]: value }, { merge: true }); }
+}
+
+function subjectMetrics(subject) {
+    const records = Object.values(subject.attendance || {});
+    const present = records.filter(record => record.status === 'present').length;
+    const total = records.filter(record => ['present', 'bunked'].includes(record.status)).length;
+    return { present, total, rate: total ? Math.round(present / total * 100) : 0 };
+}
+
+function renderSubjects() {
+    const container = document.getElementById('subjects-list');
+    if (!container) return;
+    const entries = Object.entries(subjectsData);
+    if (!entries.length) { container.innerHTML = '<div class="empty-product-state"><strong>No subjects yet</strong><span>Add your first subject to unlock subject-level attendance planning.</span></div>'; return; }
+    container.innerHTML = entries.map(([id, subject]) => {
+        const metrics = subjectMetrics(subject);
+        const target = subject.target || 75;
+        const safeBunks = metrics.present ? Math.max(0, Math.floor(metrics.present / (target / 100) - metrics.total)) : 0;
+        return `<article class="subject-card"><div class="subject-card-top"><div><h3>${subject.name}</h3><span>${metrics.present}/${metrics.total} classes tracked</span></div><strong>${metrics.rate}%</strong></div><div class="subject-progress"><span style="width:${Math.min(100, metrics.rate)}%"></span></div><div class="subject-card-foot"><span>Target ${target}%</span><span>${safeBunks} safe bunk${safeBunks === 1 ? '' : 's'}</span><button data-subject-status="present" data-subject-id="${id}">Present</button><button data-subject-status="bunked" data-subject-id="${id}">Bunk</button><button data-delete-subject="${id}" aria-label="Delete ${subject.name}">×</button></div></article>`;
+    }).join('');
+    container.querySelectorAll('[data-delete-subject]').forEach(button => button.addEventListener('click', async () => { delete subjectsData[button.dataset.deleteSubject]; await saveProductData('subjects', subjectsData); renderSubjects(); }));
+    container.querySelectorAll('[data-subject-status]').forEach(button => button.addEventListener('click', async () => {
+        const subject = subjectsData[button.dataset.subjectId];
+        subject.attendance = subject.attendance || {};
+        const key = todayKey();
+        subject.attendance[key] = { date: `${key}T00:00:00.000Z`, status: button.dataset.subjectStatus };
+        await saveProductData('subjects', subjectsData);
+        renderSubjects();
+    }));
+}
+
+function renderTimetable() {
+    const container = document.getElementById('timetable-grid');
+    if (!container) return;
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    container.innerHTML = days.map(day => `<div class="timetable-day"><strong>${day}</strong>${timetableData.filter(item => item.day.toLowerCase() === day.toLowerCase()).sort((a, b) => a.time.localeCompare(b.time)).map(item => `<span><b>${item.time}</b>${item.subject}</span>`).join('') || '<em>No classes</em>'}</div>`).join('');
+}
+
+function renderHolidayForecast() {
+    const container = document.getElementById('holiday-forecast');
+    if (!container) return;
+    const today = new Date();
+    const recorded = Object.entries(attendanceData).filter(([key, record]) => record.status === 'holiday' && new Date(`${key}T00:00:00`) > today).map(([date, record]) => ({ date, title: record.title || 'Holiday' }));
+    const upcoming = [...recorded, ...holidayForecastData.filter(item => !attendanceData[item.date])].sort((a, b) => a.date.localeCompare(b)).slice(0, 4);
+    if (!upcoming.length) { container.hidden = true; return; }
+    container.hidden = false;
+    container.innerHTML = `<span class="forecast-label">UPCOMING</span>${upcoming.map(item => `<span class="forecast-item"><b>${formatUserDate(new Date(`${item.date}T00:00:00`), { month: 'short', day: 'numeric' })}</b>${item.title}<small>Locked until date</small></span>`).join('')}`;
+}
+
+function connectGoogleCalendar() {
+    window.location.href = calendarEndpoint('login');
+}
+
+async function syncGoogleCalendarEvents() {
+    try {
+        const response = await fetch(calendarEndpoint('events'), { credentials: 'include' });
+        if (!response.ok) return;
+        const data = await response.json();
+        holidayForecastData = [...holidayForecastData, ...(data.events || []).filter(event => !holidayForecastData.some(item => item.date === event.date))];
+        renderHolidayForecast();
+        const status = document.getElementById('google-calendar-status');
+        if (status) status.textContent = `${data.events?.length || 0} Google Calendar events synced. Recommendations remain optional.`;
+    } catch {
+        // Calendar connection is optional and should never block attendance.
     }
 }
 
@@ -1153,6 +1299,7 @@ function setupSettings() {
     document.getElementById('enable-reminders')?.addEventListener('click', requestReminderPermission);
     document.getElementById('detect-location')?.addEventListener('click', detectLocation);
     document.getElementById('college-calendar-file')?.addEventListener('change', handleCollegeCalendarUpload);
+    document.getElementById('connect-google-calendar')?.addEventListener('click', connectGoogleCalendar);
     updateNotificationStatus();
 }
 
@@ -1201,6 +1348,7 @@ async function loadSettings() {
             else el.value = String(val);
             userSettings[key] = val;
         });
+        holidayForecastData = settings.holidayForecast || [];
 
         const workingDays = settings.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
         document.querySelectorAll('input[name="working-days"]').forEach(cb => {
@@ -1212,6 +1360,7 @@ async function loadSettings() {
         scheduleSessionTimeout(settings.sessionTimeout || '60');
         scheduleAutoBackup(settings.autoBackup !== false);
         renderSmartInsights();
+        renderHolidayForecast();
         scheduleSmartReminder(settings.smartReminders);
     } catch (error) {
         console.error('Error loading settings:', error);
@@ -1264,6 +1413,8 @@ function renderSmartInsights() {
 async function persistAttendanceRecord(dateKey, record) {
     attendanceData[dateKey] = record;
     renderCurrentMonth();
+    renderTodayCommand();
+    renderHolidayForecast();
     if (!auth.currentUser) return;
     const ref = doc(db, 'users', auth.currentUser.uid);
     try {
@@ -1285,6 +1436,9 @@ async function fetchHolidaySuggestions() {
         if (!response.ok) throw new Error('Holiday service unavailable');
         const holidays = await response.json();
         const suggestions = holidays.filter(holiday => !attendanceData[holiday.date]);
+        holidayForecastData = suggestions.map(holiday => ({ date: holiday.date, title: holiday.localName || holiday.name }));
+        await saveSetting('holidayForecast', holidayForecastData);
+        renderHolidayForecast();
         if (!suggestions.length) {
             container.innerHTML = '<p class="smart-empty">No new public holidays found for this year.</p>';
             return;
@@ -1554,9 +1708,14 @@ async function importUserData() {
             const updateData = {};
             if (data.attendance) updateData.attendance = data.attendance;
             if (data.settings) updateData.settings = data.settings;
+            if (data.subjects) updateData.subjects = data.subjects;
+            if (data.timetable) updateData.timetable = data.timetable;
             await updateDoc(doc(db, 'users', auth.currentUser.uid), updateData);
             attendanceData = data.attendance || {};
+            subjectsData = data.subjects || {};
+            timetableData = data.timetable || [];
             updateStats(); renderCalendar(); loadInsights(); loadSettings();
+            renderSubjects(); renderTimetable(); renderHolidayForecast();
             showToast('📤 Data imported successfully!', 'success');
         } catch (e) {
             showToast('Error importing data. Check file format.', 'error');
@@ -1570,11 +1729,14 @@ async function clearAllData() {
     if (!confirm('Clear ALL data? This cannot be undone.')) return;
     try {
         await updateDoc(doc(db, 'users', auth.currentUser.uid), {
-            attendance: {}, settings: {}, challenges: {}
+            attendance: {}, settings: {}, challenges: {}, subjects: {}, timetable: []
         });
         attendanceData = {};
         challengesData = {};
+        subjectsData = {};
+        timetableData = [];
         updateStats(); renderCalendar(); loadInsights(); renderChallenges();
+        renderSubjects(); renderTimetable(); renderTodayCommand(); renderHolidayForecast();
         showToast('🗑️ All data cleared.', 'info');
     } catch (e) {
         showToast('Error clearing data.', 'error');

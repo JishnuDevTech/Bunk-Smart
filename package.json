@@ -1,0 +1,15 @@
+{
+  "name": "bunk-smart",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "netlify dev",
+    "validate": "node --check js/dashboard.js && node --check js/landing.js"
+  },
+  "dependencies": {
+    "googleapis": "^144.0.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.37.0"
+  }
+}

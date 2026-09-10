@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="css/global.css">
   <link rel="stylesheet" href="css/landing.css">
   <link rel="stylesheet" href="css/auth.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/bunk-smart-mark.svg" type="image/svg+xml">
   <style>
     .loading-overlay {
       position: fixed;
@@ -44,7 +46,7 @@
   <!-- HEADER -->
   <header class="hero-header">
     <nav class="navbar">
-      <h2 class="brand">Bunk Smart</h2>
+      <a class="brand brand-lockup" href="index.html"><img src="assets/bunk-smart-mark.svg" alt=""> <span>Bunk Smart</span></a>
       <div class="nav-actions">
         <button id="signin-btn" class="btn-secondary">Sign In</button>
         <button id="get-started-btn" class="btn-primary">Get Started</button>
@@ -62,8 +64,8 @@
               <div class="stat-label">Attendance Rate</div>
             </div>
             <div class="stat">
-              <div class="stat-number">500+</div>
-              <div class="stat-label">Students</div>
+              <div class="stat-number">1</div>
+              <div class="stat-label">Student-first app</div>
             </div>
             <div class="stat">
               <div class="stat-number">24/7</div>
@@ -141,7 +143,7 @@
   <section class="about" id="about">
     <div class="container">
       <h2>About Bunk Smart</h2>
-      <p>Bunk Smart is a comprehensive attendance management system designed to help students track their attendance, build discipline, and achieve academic goals through intelligent insights and gamified challenges.</p>
+      <p>Bunk Smart is an independent student productivity product designed to help learners track attendance, understand patterns, and make better academic decisions.</p>
 
       <div class="about-grid">
         <div class="about-card">
@@ -156,7 +158,7 @@
 
         <div class="about-card">
           <h3>Developer</h3>
-          <p>Developed by Jishnu Rahegaonkar, a passionate software engineer focused on creating tools that promote productivity and discipline in education.</p>
+          <p>Owned and developed by Jishnu Rahegaonkar. Bunk Smart is an independent product focused on practical student productivity and attendance planning.</p>
         </div>
       </div>
     </div>
@@ -166,7 +168,7 @@
   <section class="cta-section">
     <div class="container">
       <h2>Ready to Build Better Habits?</h2>
-      <p>Join thousands of students who are transforming their academic journey with Bunk Smart.</p>
+      <p>Build a clearer academic routine with Bunk Smart.</p>
       <button id="cta-get-started" class="btn-primary btn-large">Start Your Journey</button>
     </div>
   </section>

@@ -216,6 +216,10 @@ body.theme-dark .chart-title { color: var(--text); }
 body.theme-dark .present-btn { background: linear-gradient(135deg, #15803d, #166534); color: #f0fdf4; }
 body.theme-dark .bunk-btn { background: linear-gradient(135deg, #b91c1c, #991b1b); color: #fff1f2; }
 body.theme-dark .holiday-btn { background: linear-gradient(135deg, #d97706, #b45309); color: #fffbeb; }
+body.theme-dark .today-command { background: linear-gradient(120deg, #172554, #052e16); border-color: #1d4ed8; }
+body.theme-dark .today-copy h2 { color: var(--text); }
+body.theme-dark .today-copy p { color: var(--muted); }
+body.theme-dark .forecast-strip { background: rgba(120, 53, 15, 0.18); }
 
 /* ─── LAYOUT ──────────────────────────────────────── */
 .dashboard {
@@ -252,6 +256,9 @@ body.theme-dark .holiday-btn { background: linear-gradient(135deg, #d97706, #b45
   -webkit-text-fill-color: white !important;
   background: none !important;
 }
+
+.brand-lockup { display: inline-flex; align-items: center; gap: 0.65rem; text-decoration: none; }
+.brand-lockup img { width: 34px; height: 34px; flex: 0 0 auto; }
 
 .user-info { display: flex; align-items: center; gap: 0.75rem; }
 
@@ -297,6 +304,59 @@ body.theme-dark .holiday-btn { background: linear-gradient(135deg, #d97706, #b45
 
 .nav-icon { font-size: 1.125rem; width: 20px; text-align: center; }
 .nav-text { font-size: 0.875rem; }
+
+.today-command {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: var(--radius);
+  background: linear-gradient(120deg, #eff6ff 0%, #f0fdf4 100%);
+}
+.today-copy h2 { margin: 0.15rem 0 0.25rem; font-size: 1.35rem; color: #0f172a; }
+.today-copy p { margin: 0; color: #475569; font-size: 0.85rem; }
+.eyebrow { color: var(--primary); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; }
+.today-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
+.command-btn { border: 1px solid transparent; border-radius: 0.5rem; padding: 0.6rem 0.8rem; cursor: pointer; font-size: 0.78rem; font-weight: 700; }
+.command-present { background: #16a34a; color: #fff; }
+.command-bunk { background: #dc2626; color: #fff; }
+.command-holiday { background: #f59e0b; color: #fff; }
+.command-clear { background: transparent; color: #b91c1c; border-color: #fca5a5; }
+.command-btn:disabled { opacity: 0.6; cursor: default; }
+
+.forecast-strip { display: flex; gap: 0.65rem; align-items: stretch; overflow-x: auto; margin: 0 0 1.5rem; padding: 0.7rem; border: 1px dashed #f59e0b; border-radius: 0.75rem; background: rgba(255, 251, 235, 0.7); }
+.forecast-label { display: flex; align-items: center; color: #b45309; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; }
+.forecast-item { display: grid; gap: 0.1rem; min-width: 150px; padding: 0.5rem 0.7rem; border-left: 1px solid #fde68a; color: #78350f; font-size: 0.76rem; }
+.forecast-item b { color: #92400e; }
+.forecast-item small { color: #b45309; font-size: 0.65rem; }
+
+.subject-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.subject-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.25rem; }
+.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.panel-heading h2 { margin: 0.2rem 0 0; font-size: 1.2rem; color: var(--text); }
+.subjects-list { display: grid; gap: 0.75rem; }
+.subject-card { padding: 1rem; border: 1px solid var(--border); border-radius: 0.75rem; background: var(--bg2); }
+.subject-card-top, .subject-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.subject-card-top h3 { margin: 0; color: var(--text); font-size: 0.95rem; }
+.subject-card-top span, .subject-card-foot { color: var(--muted); font-size: 0.75rem; }
+.subject-card-top strong { color: var(--primary); font-size: 1.35rem; }
+.subject-progress { height: 0.45rem; overflow: hidden; margin: 0.8rem 0; border-radius: 99px; background: var(--border); }
+.subject-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2563eb, #34d399); }
+.subject-card-foot button { margin-left: auto; border: 0; background: transparent; color: var(--red); cursor: pointer; font-size: 1.1rem; }
+.subject-card-foot button[data-subject-status] { margin-left: 0; padding: 0.25rem 0.4rem; border: 1px solid var(--border); border-radius: 0.35rem; color: var(--text2); font-size: 0.68rem; }
+.subject-card-foot button[data-subject-status="present"] { color: #15803d; border-color: #86efac; }
+.subject-card-foot button[data-subject-status="bunked"] { color: #b91c1c; border-color: #fca5a5; }
+.empty-product-state { display: grid; gap: 0.35rem; padding: 2rem 1rem; text-align: center; color: var(--muted); }
+.empty-product-state strong { color: var(--text); }
+.timetable-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.65rem; }
+.timetable-day { display: grid; gap: 0.4rem; min-height: 104px; padding: 0.7rem; border: 1px solid var(--border); border-radius: 0.65rem; background: var(--bg2); }
+.timetable-day > strong { color: var(--text); font-size: 0.75rem; }
+.timetable-day > span { display: grid; gap: 0.1rem; padding: 0.35rem; border-left: 3px solid var(--primary); background: var(--surface); color: var(--text2); font-size: 0.7rem; }
+.timetable-day > span b { color: var(--primary); font-size: 0.65rem; }
+.timetable-day > em { color: var(--muted); font-size: 0.7rem; }
 
 .sidebar-footer {
   padding: 1.25rem 1.5rem;
@@ -1348,6 +1408,9 @@ body.theme-dark .holiday-btn { background: linear-gradient(135deg, #d97706, #b45
   .smart-location-grid { width: 100%; }
   .smart-insights { grid-template-columns: 1fr; padding-left: 1rem; padding-right: 1rem; }
   .smart-results { margin-left: 1rem; margin-right: 1rem; }
+  .today-command { align-items: flex-start; flex-direction: column; }
+  .today-actions { justify-content: flex-start; }
+  .subject-layout { grid-template-columns: 1fr; }
   .hamburger { display: flex; align-items: center; justify-content: center; }
   .content-section { padding: 1rem; padding-top: 3.5rem; }
 
@@ -1376,6 +1439,8 @@ body.theme-dark .holiday-btn { background: linear-gradient(135deg, #d97706, #b45
   .day-cell { font-size: 0.75rem; }
   .data-actions { flex-direction: column; }
   .data-action-btn { flex: none; }
+  .timetable-grid { grid-template-columns: 1fr; }
+  .panel-heading { align-items: flex-start; flex-direction: column; }
 }
 
 /* ─── CUSTOM CHALLENGE FLOATING MODAL ──────────── */

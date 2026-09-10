@@ -2,6 +2,8 @@ import { auth } from './firebase.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js';
 import { signOut } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js';
 
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+
 // Update UI for authenticated users
 function updateUIForAuthenticatedUser(user) {
   // Change sign in button to "Sign Out"

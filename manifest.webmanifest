@@ -1,0 +1,12 @@
+{
+  "name": "Bunk Smart",
+  "short_name": "Bunk Smart",
+  "description": "A smart attendance and student planning companion.",
+  "start_url": "dashboard.html",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "assets/bunk-smart-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

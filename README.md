@@ -34,6 +34,10 @@ It’s **student decision intelligence**.
 - Visual analytics dashboard  
 - Responsive UI (Mobile + Desktop)  
 - Fast and lightweight performance  
+- Installable PWA shell with offline app assets
+- Today command center with one-click actions
+- Subject-level attendance and weekly timetable
+- Optional locked holiday forecasts and Google Calendar connection surface
 
 ---
 
@@ -68,29 +72,62 @@ place for attendance rules: monthly rate, streaks, trend data, holidays, and
 future-date validation. Run its focused checks with:
 
 ```bash
-python3 -m unittest discover -s python -p 'test_*.py'
+python3 -m py_compile python/attendance_engine.py
 ```
 
-The current Netlify frontend still reads Firebase directly, so it cannot run
-Python in the browser. The module uses the same record contract and is ready
-to be called from a Python API when server-side scoring is introduced.
+The current Netlify frontend reads Firebase directly. The module is kept as a
+dependency-free reference for future server-side scoring.
 
 ### Optional smart-calendar integrations
 
 - Public holiday suggestions use [Nager.Date](https://date.nager.at/). It is
-	free for this use and does not require an API key. The frontend calls its
-	public-holiday endpoint after the user chooses a country.
+  free for this use and does not require an API key. The frontend calls its
+  public-holiday endpoint after the user chooses a country.
 - College calendars need no API key: upload a CSV with `date,title` columns or
-	a JSON array such as `[{"date":"2026-09-15","title":"College holiday"}]`.
+  a JSON array such as `[{"date":"2026-09-15","title":"College holiday"}]`.
 - Browser reminders use the Web Notifications API and require the user's
-	browser permission. They work while the app is open; reliable background
-	reminders require a service worker and push provider later.
+  browser permission. They work while the app is open; reliable background
+  reminders require a service worker and push provider later.
 
-For a production backend, use a server-side provider such as
-[Calendarific](https://calendarific.com/) or
-[Google Calendar API](https://developers.google.com/calendar/api). Put those
-keys in server environment variables such as `CALENDARIFIC_API_KEY`, never in
-`dashboard.js`, HTML, Firebase documents, or a public Netlify deployment.
+### Google Calendar setup
+
+- The current frontend includes a safe connection placeholder but does not ask
+  for private Google events without OAuth. To enable it, create a Google Cloud
+  project, enable Google Calendar API, configure the OAuth consent screen, and
+  create a Web application OAuth client. Add the deployed origin and a backend
+  callback such as `/api/google/callback` to the authorized origins and redirect
+  URIs. Store `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` only on the Python
+  backend. The backend should request read-only `calendar.events` access, store
+  refresh tokens encrypted, and return only normalized event data to the app.
+
+This is the correct route for birthdays and festival events because private
+calendar data must not be accessed with a browser-exposed secret.
+
+The Google Calendar integration now runs as same-site Netlify Functions, so a
+separate Render service is not required. Netlify hosts the static app and the
+OAuth endpoints together. Put the following variables in Netlify's site
+settings under **Environment variables**:
+
+```env
+GOOGLE_CLIENT_ID=your_client_id
+GOOGLE_CLIENT_SECRET=your_client_secret
+GOOGLE_REDIRECT_URI=https://bunk-smart.netlify.app/.netlify/functions/google-callback
+FRONTEND_URL=https://bunk-smart.netlify.app
+SESSION_SECRET=your_long_random_secret
+```
+
+Use `netlify dev` locally; it serves the frontend and Functions together.
+
+For local Netlify development, Netlify reads `.env` from the repository root.
+Copy the variables into a root `.env` manually, or add them in the Netlify CLI
+environment. Do not commit either file; both are ignored by `.gitignore`.
+
+### Ownership
+
+Bunk Smart is owned and developed by Jishnu Rahegaonkar. The repository uses
+the MIT license in `LICENSE`; third-party services, fonts, and libraries keep
+their own terms. Never commit Firebase service-account credentials, Google OAuth
+secrets, push-provider keys, or other private credentials.
 
 ---
 
