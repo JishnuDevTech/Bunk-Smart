@@ -240,6 +240,9 @@
     }
     .social-btn:hover { border-color:#94a3b8; background:var(--surface); transform:translateY(-1px); box-shadow:0 2px 8px rgba(0,0,0,.08); }
     .social-btn svg { width:17px; height:17px; flex-shrink:0; }
+    .legal-consent { display:flex; align-items:flex-start; gap:.55rem; margin:.25rem 0 .75rem; color:var(--muted); font-size:.75rem; line-height:1.5; }
+    .legal-consent input { margin-top:.2rem; accent-color:var(--primary); flex:0 0 auto; }
+    .legal-consent a { color:var(--primary); font-weight:700; }
 
     @media (max-width: 860px) {
       body { flex-direction: column; }
@@ -394,6 +397,8 @@
             </button>
           </div>
         </div>
+
+        <label class="legal-consent"><input type="checkbox" id="signup-legal-consent" required><span>I agree to the <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> and acknowledge the <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
 
         <button type="submit" class="submit-btn">Create Account</button>
         <div class="divider">or continue with</div>

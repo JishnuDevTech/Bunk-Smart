@@ -8,6 +8,10 @@ import {
   GoogleAuthProvider,
   GithubAuthProvider
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+import { doc, setDoc } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js';
+import { db } from './firebase.js';
+
+const LEGAL_VERSION = '2026-09-10-v1';
 
 // Function to get user-friendly error messages
 function getFriendlyErrorMessage(error) {
@@ -61,6 +65,25 @@ const toggleText = document.getElementById("toggle-text");
 const googleBtn = document.getElementById("google-btn");
 const githubBtn = document.getElementById("github-btn");
 const forgotPasswordLink = document.getElementById("forgot-password-link");
+
+function legalConsentProvided() {
+  const checkbox = document.getElementById('signup-legal-consent');
+  if (!checkbox || checkbox.checked) return true;
+  alert('Please agree to the Terms of Service and Privacy Policy to create an account.');
+  checkbox.focus();
+  return false;
+}
+
+async function saveInitialLegalConsent(user) {
+  await setDoc(doc(db, 'users', user.uid), {
+    settings: {
+      legalConsent: true,
+      termsAcceptedAt: new Date().toISOString(),
+      privacyAcceptedAt: new Date().toISOString(),
+      legalVersion: LEGAL_VERSION
+    }
+  }, { merge: true });
+}
 
 // Password visibility toggles (only if elements exist)
 const loginPasswordToggle = document.getElementById("login-toggle");
@@ -163,12 +186,14 @@ if (loginForm) {
 if (signupForm) {
   signupForm.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (!legalConsentProvided()) return;
     const name = document.getElementById("signup-name").value;
     const email = document.getElementById("signup-email").value;
     const password = signupPasswordInput.value;
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await saveInitialLegalConsent(userCredential.user);
       console.log("Account created:", userCredential.user);
       alert("Account created successfully!");
       // Update display name if provided

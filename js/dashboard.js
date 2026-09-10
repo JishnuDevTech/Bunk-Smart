@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs } from
 import { onAuthStateChanged, updateProfile, multiFactor, PhoneAuthProvider, PhoneMultiFactorGenerator, RecaptchaVerifier } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js';
 
 const CALENDAR_API_BASE = localStorage.getItem('bunkSmartCalendarApi') || '/.netlify/functions';
+const LEGAL_VERSION = '2026-09-10-v1';
 const calendarEndpoint = action => CALENDAR_API_BASE.includes('/.netlify/functions')
     ? `${CALENDAR_API_BASE}/google-${action}`
     : `${CALENDAR_API_BASE}/api/google/${action}`;
@@ -120,6 +121,7 @@ async function loadUserData() {
     showLoading();
     try {
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        let settings = {};
         if (!userDoc.exists()) {
             await setDoc(doc(db, 'users', auth.currentUser.uid), {
                 attendance: {}, challenges: {}, subjects: {}, timetable: [], settings: {}
@@ -132,7 +134,9 @@ async function loadUserData() {
             challengesData = data.challenges || {};
             subjectsData = data.subjects || {};
             timetableData = data.timetable || [];
+            settings = data.settings || {};
         }
+        await ensureLegalConsent(settings);
         updateStats();
         renderCalendar();
         loadInsights();
@@ -150,6 +154,29 @@ async function loadUserData() {
     } finally {
         hideLoading();
     }
+}
+
+async function ensureLegalConsent(settings) {
+    if (settings.legalConsent === true && settings.legalVersion === LEGAL_VERSION) return;
+    const existing = document.getElementById('legal-consent-modal');
+    if (existing) return;
+    const modal = document.createElement('div');
+    modal.id = 'legal-consent-modal';
+    modal.className = 'legal-consent-modal';
+    modal.innerHTML = `<div class="legal-consent-card"><span class="eyebrow">ONE-TIME ACCOUNT SETUP</span><h2>Welcome to Bunk Smart</h2><p>Before you continue, please review and accept our current policies.</p><label><input type="checkbox" id="legal-consent-checkbox"><span>I agree to the <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> and acknowledge the <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span></label><button id="accept-legal-consent" class="btn-primary" disabled>Continue to Bunk Smart</button></div>`;
+    document.body.appendChild(modal);
+    const checkbox = document.getElementById('legal-consent-checkbox');
+    const accept = document.getElementById('accept-legal-consent');
+    checkbox?.addEventListener('change', () => { if (accept) accept.disabled = !checkbox.checked; });
+    accept?.addEventListener('click', async () => {
+        if (!checkbox?.checked || !auth.currentUser) return;
+        accept.disabled = true;
+        await saveSetting('legalConsent', true);
+        await saveSetting('termsAcceptedAt', new Date().toISOString());
+        await saveSetting('privacyAcceptedAt', new Date().toISOString());
+        await saveSetting('legalVersion', LEGAL_VERSION);
+        modal.remove();
+    });
 }
 
 function setupTodayCommand() {
