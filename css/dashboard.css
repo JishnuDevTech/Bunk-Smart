@@ -43,8 +43,27 @@ body.theme-dark {
   color: var(--text);
 }
 
+body.theme-light {
+  --bg: #f4f7fb;
+  --bg2: #edf3ff;
+  --surface: rgba(255, 255, 255, 0.9);
+  --surface2: rgba(248, 250, 252, 0.96);
+  --border: rgba(148, 163, 184, 0.25);
+  --text: #0f172a;
+  --text2: #334155;
+  --muted: #64748b;
+  --shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 18px 42px rgba(37, 99, 235, 0.12);
+}
+
 body.theme-dark .main-content,
 body.theme-dark .content-section {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body.theme-light .main-content,
+body.theme-light .content-section {
   background: var(--bg);
   color: var(--text);
 }
@@ -251,6 +270,66 @@ body.theme-dark .empty-product-state {
 body.theme-dark .mfa-recaptcha {
   background: rgba(15,23,42,0.7);
   border-color: rgba(96,165,250,0.3);
+}
+
+body.theme-dark .smart-panel,
+body.theme-dark .smart-subpanel,
+body.theme-dark .subject-panel,
+body.theme-dark .planner-panel,
+body.theme-dark .attendance-container {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(17, 24, 39, 0.96));
+  border-color: rgba(148, 163, 184, 0.18);
+  color: var(--text);
+  box-shadow: 0 16px 34px rgba(2, 6, 23, 0.28);
+}
+
+body.theme-dark .smart-alert,
+body.theme-dark .today-class-item,
+body.theme-dark .goal-ring::before,
+body.theme-dark .subject-card,
+body.theme-dark .timetable-day,
+body.theme-dark .stat-card {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: rgba(148, 163, 184, 0.18);
+  color: var(--text);
+}
+
+body.theme-dark .smart-alert strong,
+body.theme-dark .today-class-item strong,
+body.theme-dark .goal-row strong,
+body.theme-dark .subject-card h3,
+body.theme-dark .timetable-day strong,
+body.theme-dark .planner-panel h3,
+body.theme-dark .stat-value {
+  color: var(--text);
+}
+
+body.theme-dark .smart-alert small,
+body.theme-dark .today-class-item small,
+body.theme-dark .goal-row,
+body.theme-dark .subject-card-foot,
+body.theme-dark .timetable-day em,
+body.theme-dark .stat-label {
+  color: var(--muted);
+}
+
+body.theme-dark .goal-ring::before {
+  background: rgba(15, 23, 42, 0.96);
+}
+
+body.theme-light .smart-panel,
+body.theme-light .smart-subpanel,
+body.theme-light .subject-panel,
+body.theme-light .planner-panel,
+body.theme-light .attendance-container,
+body.theme-light .smart-alert,
+body.theme-light .today-class-item,
+body.theme-light .subject-card,
+body.theme-light .timetable-day,
+body.theme-light .stat-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.96));
+  border-color: rgba(148, 163, 184, 0.18);
+  color: var(--text);
 }
 
 /* ─── LAYOUT ──────────────────────────────────────── */

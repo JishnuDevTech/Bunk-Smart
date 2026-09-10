@@ -1,0 +1,165 @@
+/* Responsive compatibility for Bunk Smart dashboard */
+
+@media (max-width: 1180px) {
+  :root {
+    --sidebar-w: 240px;
+  }
+
+  .planner-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .subject-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .main-content {
+    margin-left: 0;
+    padding-top: 0;
+  }
+
+  .sidebar {
+    transform: translateX(-110%);
+    width: min(82vw, 300px);
+    box-shadow: 18px 0 42px rgba(15, 23, 42, 0.18);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .hamburger {
+    display: block;
+  }
+
+  .content-section {
+    padding: 1.2rem 1rem 1.5rem;
+  }
+
+  .section-header h1 {
+    font-size: 1.55rem;
+  }
+
+  .today-command {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .today-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .smart-dashboard,
+  .smart-dashboard.full-width,
+  .stats-cards,
+  .timetable-grid,
+  .full-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .section-header {
+    margin-bottom: 1.2rem;
+  }
+
+  .stats-cards {
+    gap: 0.85rem;
+  }
+
+  .stat-card {
+    padding: 0.9rem 0.9rem;
+  }
+
+  .stat-value {
+    font-size: 1.4rem;
+  }
+
+  .attendance-container,
+  .planner-panel,
+  .subject-panel,
+  .smart-panel,
+  .smart-subpanel {
+    border-radius: 1rem;
+  }
+
+  .month-header {
+    gap: 0.6rem;
+  }
+
+  .month-header h3 {
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  .calendar-grid {
+    gap: 0.42rem;
+  }
+
+  .day-cell {
+    min-height: 52px;
+    padding: 0.35rem;
+    font-size: 0.72rem;
+  }
+
+  .day-cell .day-number {
+    font-size: 0.7rem;
+  }
+
+  .planner-day-list li,
+  .upcoming-list li {
+    font-size: 0.72rem;
+  }
+
+  .today-actions {
+    gap: 0.5rem;
+  }
+
+  .command-btn {
+    flex: 1 1 calc(50% - 0.5rem);
+    min-width: 0;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .content-section {
+    padding: 0.9rem 0.8rem 1.25rem;
+  }
+
+  .section-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .section-header p {
+    font-size: 0.9rem;
+  }
+
+  .today-copy h2 {
+    font-size: 1.1rem;
+  }
+
+  .today-copy p {
+    font-size: 0.78rem;
+  }
+
+  .command-btn {
+    flex-basis: 100%;
+  }
+
+  .day-cell {
+    min-height: 46px;
+  }
+
+  .smart-alert {
+    padding: 0.7rem 0.75rem;
+  }
+
+  .goal-ring {
+    width: 84px;
+    height: 84px;
+  }
+}
