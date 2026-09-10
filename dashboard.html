@@ -39,6 +39,10 @@
         <span class="nav-icon">📅</span>
         <span class="nav-text">Attendance</span>
       </a>
+      <a href="#smart" class="nav-item" data-section="smart">
+        <span class="nav-icon">✨</span>
+        <span class="nav-text">Smart Nudge</span>
+      </a>
       <a href="#subjects" class="nav-item" data-section="subjects">
         <span class="nav-icon">📚</span>
         <span class="nav-text">Subjects</span>
@@ -84,12 +88,38 @@
         <div class="today-actions"><button id="today-present" class="command-btn command-present">Present</button><button id="today-bunk" class="command-btn command-bunk">Bunk</button><button id="today-holiday" class="command-btn command-holiday">Holiday</button><button id="today-clear" class="command-btn command-clear">Clear</button></div>
       </div>
 
-      <div class="daily-focus-panel" id="daily-focus-panel">
-        <div class="focus-header">
-          <span class="eyebrow">DAILY FOCUS</span>
-          <h3>What matters most today</h3>
+      <div class="smart-dashboard" id="smart-dashboard">
+        <div class="smart-panel">
+          <div class="panel-heading compact-heading">
+            <div>
+              <span class="eyebrow">SMART ALERTS</span>
+              <h2>What needs attention today</h2>
+            </div>
+          </div>
+          <div id="daily-focus" class="smart-alerts"></div>
         </div>
-        <div id="daily-focus" class="daily-focus-list"></div>
+
+        <div class="smart-side-stack">
+          <div class="smart-subpanel">
+            <div class="panel-heading compact-heading">
+              <div>
+                <span class="eyebrow">TODAY'S CLASSES</span>
+                <h2>Academic planner</h2>
+              </div>
+            </div>
+            <div id="today-classes" class="today-classes"></div>
+          </div>
+
+          <div class="smart-subpanel">
+            <div class="panel-heading compact-heading">
+              <div>
+                <span class="eyebrow">DISCIPLINE</span>
+                <h2>30-day goal</h2>
+              </div>
+            </div>
+            <div id="goal-progress" class="goal-progress"></div>
+          </div>
+        </div>
       </div>
 
       <div class="stats-cards">
@@ -162,6 +192,36 @@
             <ul id="upcoming-list" class="upcoming-list"></ul>
           </div>
         </aside>
+      </div>
+    </section>
+
+    <!-- SMART NUDGE SECTION -->
+    <section id="smart-section" class="content-section">
+      <div class="section-header">
+        <h1>Smart Nudge Center</h1>
+        <p>Short, useful reminders and daily momentum for attendance and tasks</p>
+      </div>
+
+      <div class="smart-dashboard full-width">
+        <div class="smart-panel">
+          <div class="panel-heading compact-heading">
+            <div>
+              <span class="eyebrow">LIVE ALERTS</span>
+              <h2>Attendance & task nudges</h2>
+            </div>
+          </div>
+          <div id="smart-nudge-list" class="smart-alerts"></div>
+        </div>
+
+        <div class="smart-subpanel">
+          <div class="panel-heading compact-heading">
+            <div>
+              <span class="eyebrow">INSIGHTS</span>
+              <h2>What your pattern says</h2>
+            </div>
+          </div>
+          <div id="smart-insights" class="smart-insights full-grid" aria-live="polite"></div>
+        </div>
       </div>
     </section>
 

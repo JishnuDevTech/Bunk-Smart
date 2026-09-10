@@ -173,6 +173,7 @@ async function loadUserData() {
         renderSubjects();
         renderTimetable();
         renderHolidayForecast();
+        renderDailyFocus();
         const calendarConnectedQuery = new URLSearchParams(window.location.search).get('calendar') === 'connected';
         if (calendarConnectedQuery) {
             localStorage.setItem('bunkSmartGoogleConnected', 'true');
@@ -235,47 +236,165 @@ function renderTodayCommand() {
     renderDailyFocus();
 }
 
-function renderDailyFocus() {
-    const container = document.getElementById('daily-focus');
+function getSmartAlerts() {
+    const target = Math.min(100, Math.max(1, Number(document.getElementById('smart-target')?.value || 75)));
+    const now = new Date();
+    const monthStats = getMonthMetrics(now.getFullYear(), now.getMonth());
+    const todayRecord = attendanceData[todayKey()];
+    const alerts = [];
+
+    if (!todayRecord) {
+        alerts.push({
+            type: 'warning',
+            icon: '⚠️',
+            title: "Today's attendance is still unmarked.",
+            detail: 'Mark present, bunked, or holiday before the day ends.'
+        });
+    } else if (todayRecord.status === 'holiday') {
+        alerts.push({
+            type: 'success',
+            icon: '🎉',
+            title: `Tomorrow is a holiday — your planner is cleared.`,
+            detail: todayRecord.title || 'Holiday recorded.'
+        });
+    }
+
+    const attendanceRate = monthStats.totalCount ? Math.round((monthStats.presentCount / monthStats.totalCount) * 100) : 0;
+    if (attendanceRate < target) {
+        const needed = Math.max(1, Math.ceil((target * Math.max(monthStats.totalCount || 1, 1)) / 100) - monthStats.presentCount);
+        alerts.push({
+            type: 'alert',
+            icon: '📉',
+            title: `Your attendance is below ${target}% this month.`,
+            detail: `You need ${needed} more attended class${needed === 1 ? '' : 'es'} to reach your target.`
+        });
+    } else {
+        alerts.push({
+            type: 'success',
+            icon: '✅',
+            title: `You are on pace for ${target}% attendance.`,
+            detail: `Current month rate: ${attendanceRate}%.`
+        });
+    }
+
+    const subjectWarning = Object.values(subjectsData).filter(subject => {
+        const metrics = subjectMetrics(subject);
+        return metrics.total > 0 && metrics.rate < (subject.target || 75);
+    }).sort((a, b) => (subjectMetrics(a).rate || 0) - (subjectMetrics(b).rate || 0))[0];
+    if (subjectWarning) {
+        const m = subjectMetrics(subjectWarning);
+        alerts.push({
+            type: 'info',
+            icon: '📚',
+            title: `${subjectWarning.name} needs attention.`,
+            detail: `Current rate is ${m.rate}% and your target is ${subjectWarning.target || 75}%.`
+        });
+    }
+
+    const pendingWeek = timetableData.filter(item => {
+        const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+        return item.day.toLowerCase() === dayName.toLowerCase();
+    }).length;
+    if (pendingWeek > 0) {
+        alerts.push({
+            type: 'info',
+            icon: '⏰',
+            title: `You have ${pendingWeek} pending class${pendingWeek === 1 ? '' : 'es'} this week.`,
+            detail: 'Use the timetable to stay ahead of your routine.'
+        });
+    }
+
+    const nextHoliday = holidayForecastData.find(item => item.date >= formatDate(now));
+    if (nextHoliday) {
+        alerts.push({
+            type: 'success',
+            icon: '🌴',
+            title: 'Upcoming holiday planned.',
+            detail: `${nextHoliday.title} on ${formatUserDate(new Date(`${nextHoliday.date}T00:00:00`), { month: 'short', day: 'numeric' })}.`
+        });
+    }
+
+    return alerts.slice(0, 4);
+}
+
+function renderTodayClasses() {
+    const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    const container = document.getElementById('today-classes');
     if (!container) return;
 
-    const todayKeyValue = todayKey();
-    const record = attendanceData[todayKeyValue];
-    const currentMonth = new Date().getMonth();
-    const workingDays = Object.keys(attendanceData).filter(dateKey => {
-        const d = new Date(`${dateKey}T00:00:00`);
-        return d.getMonth() === currentMonth;
-    }).length;
-
-    const tasks = [];
-    if (!record) {
-        tasks.push({ icon: '✅', text: 'Mark today’s attendance before the day ends.' });
-    } else {
-        tasks.push({ icon: record.status === 'holiday' ? '🎉' : record.status === 'present' ? '✅' : '⚠️', text: record.status === 'holiday' ? `Holiday saved: ${record.title || 'Special day'}` : `${record.status === 'present' ? 'Present' : 'Bunked'} recorded for today.` });
+    const classes = timetableData.filter(item => item.day.toLowerCase() === todayName.toLowerCase()).sort((a, b) => a.time.localeCompare(b.time));
+    if (!classes.length) {
+        container.innerHTML = '<div class="empty-class-state">No classes planned for today. Use your timetable to add a routine.</div>';
+        return;
     }
 
-    const target = Math.min(100, Math.max(1, Number(document.getElementById('smart-target')?.value || 75)));
-    const monthStats = getMonthMetrics(new Date().getFullYear(), new Date().getMonth());
-    const projected = monthStats.totalCount ? Math.round((monthStats.presentCount / monthStats.totalCount) * 100) : 0;
-    tasks.push({ icon: '📈', text: `Current momentum: ${projected}% attendance this month. Target: ${target}%` });
-
-    const nextUnmarked = Object.keys(attendanceData).find(dateKey => {
-        const date = new Date(`${dateKey}T00:00:00`);
-        return date > new Date() && isWorkingDay(date) && !attendanceData[dateKey];
-    });
-
-    if (nextUnmarked) {
-        tasks.push({ icon: '🗓️', text: `Upcoming working day: ${formatUserDate(new Date(`${nextUnmarked}T00:00:00`), { month: 'short', day: 'numeric' })}` });
-    } else {
-        tasks.push({ icon: '💡', text: 'Your planner is clear for the upcoming working days.' });
-    }
-
-    container.innerHTML = tasks.map(item => `
-        <div class="focus-item">
-          <span class="focus-icon">${item.icon}</span>
-          <span>${item.text}</span>
+    container.innerHTML = classes.map(item => `
+        <div class="today-class-item">
+          <span class="today-class-time">${item.time}</span>
+          <div>
+            <strong>${item.subject}</strong>
+            <small>${item.day}</small>
+          </div>
         </div>
     `).join('');
+}
+
+function renderGoalProgress() {
+    const container = document.getElementById('goal-progress');
+    if (!container) return;
+
+    const now = new Date();
+    const monthStats = getMonthMetrics(now.getFullYear(), now.getMonth());
+    const attendanceRate = monthStats.totalCount ? Math.round((monthStats.presentCount / monthStats.totalCount) * 100) : 0;
+    const streak = Number(document.getElementById('streak')?.textContent || 0);
+    const habitScore = Math.min(100, Math.round((attendanceRate * 0.7) + (streak * 2.5)));
+    const target = Number(document.getElementById('smart-target')?.value || 75);
+
+    container.innerHTML = `
+        <div class="goal-ring-wrap">
+          <div class="goal-ring" style="--progress:${habitScore}%">
+            <span>${habitScore}%</span>
+          </div>
+        </div>
+        <div class="goal-meta">
+          <div class="goal-row"><span>Target</span><strong>${target}%</strong></div>
+          <div class="goal-row"><span>Streak</span><strong>${streak} days</strong></div>
+          <div class="goal-row"><span>Monthly rate</span><strong>${attendanceRate}%</strong></div>
+        </div>
+    `;
+}
+
+function renderDailyFocus() {
+    const container = document.getElementById('daily-focus');
+    const smartNudgeContainer = document.getElementById('smart-nudge-list');
+    const alerts = getSmartAlerts();
+
+    if (container) {
+        container.innerHTML = alerts.map(item => `
+            <div class="smart-alert ${item.type}">
+                <span class="smart-alert-icon">${item.icon}</span>
+                <div>
+                    <strong>${item.title}</strong>
+                    <small>${item.detail}</small>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    if (smartNudgeContainer) {
+        smartNudgeContainer.innerHTML = alerts.map(item => `
+            <div class="smart-alert ${item.type}">
+                <span class="smart-alert-icon">${item.icon}</span>
+                <div>
+                    <strong>${item.title}</strong>
+                    <small>${item.detail}</small>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    renderTodayClasses();
+    renderGoalProgress();
 }
 
 async function markToday(status, title = '') {
@@ -1948,7 +2067,8 @@ function renderSmartInsights() {
     container.innerHTML = `
       <div class="smart-insight"><strong>Safe-bunk estimate</strong><span>${safeBunks} day${safeBunks === 1 ? '' : 's'} at or above ${Math.round(target * 100)}%</span></div>
       <div class="smart-insight"><strong>Month forecast</strong><span>${projectedRate}% if you attend the remaining ${remainingWorkingDays} working day${remainingWorkingDays === 1 ? '' : 's'}</span></div>
-      <div class="smart-insight"><strong>Pattern insight</strong><span>${pattern}</span></div>`;
+      <div class="smart-insight"><strong>Pattern insight</strong><span>${pattern}</span></div>
+      <div class="smart-insight"><strong>Task rhythm</strong><span>${timetableData.length ? `${timetableData.length} class blocks are in your planner.` : 'Add your timetable to unlock the academic planner.'}</span></div>`;
 }
 
 async function persistAttendanceRecord(dateKey, record) {
