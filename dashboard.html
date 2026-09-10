@@ -142,6 +142,9 @@
             </div>
             <h3 id="planner-date">Loading date</h3>
             <ul id="planner-day-list" class="planner-day-list"></ul>
+            <div class="planner-panel-actions">
+              <button id="add-day-event" class="btn-save-inline" type="button">+ Add event</button>
+            </div>
           </div>
 
           <div class="planner-panel">
@@ -901,6 +904,7 @@
       <button class="modal-close" id="modal-close">&times;</button>
       <h3>Mark Attendance</h3>
       <p id="selected-date">Select a date</p>
+      <p id="attendance-modal-hint" class="modal-helper">Choose a status, edit it, or clear it when needed.</p>
 
       <div class="attendance-options">
         <button class="attendance-btn present-btn" id="mark-present">
@@ -931,6 +935,62 @@
 
       <button id="clear-attendance" class="btn-clear-attendance" type="button">Clear this date</button>
       <button id="save-attendance" class="btn-primary">Save Attendance</button>
+    </div>
+  </div>
+
+  <!-- EVENT EDITOR MODAL -->
+  <div class="modal" id="event-editor-modal" hidden>
+    <div class="modal-content event-editor-content">
+      <button class="modal-close" id="event-editor-close">&times;</button>
+      <div class="custom-modal-header">
+        <span class="custom-modal-icon">🗓️</span>
+        <div>
+          <h3 id="event-editor-title">Plan an event</h3>
+          <p id="event-editor-subtitle">Add a personal note, reminder, or calendar item.</p>
+        </div>
+      </div>
+
+      <div class="event-editor-form">
+        <div class="custom-field">
+          <label for="event-title-input">Event title</label>
+          <input type="text" id="event-title-input" placeholder="e.g., Project review, Birthday, Study sprint">
+        </div>
+
+        <div class="custom-field-row two-col">
+          <div class="custom-field">
+            <label for="event-date-input">Date</label>
+            <input type="date" id="event-date-input">
+          </div>
+          <div class="custom-field">
+            <label for="event-type-select">Type</label>
+            <select id="event-type-select">
+              <option value="event">Event</option>
+              <option value="study">Study</option>
+              <option value="meeting">Meeting</option>
+              <option value="personal">Personal</option>
+              <option value="holiday">Holiday</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="custom-field">
+          <label for="event-notes-input">Notes</label>
+          <textarea id="event-notes-input" rows="3" placeholder="Optional details, reminders, or context"></textarea>
+        </div>
+
+        <label class="check-row" for="sync-google-event-toggle">
+          <input type="checkbox" id="sync-google-event-toggle">
+          <span>Send this to Google Calendar</span>
+        </label>
+
+        <div class="event-editor-actions">
+          <button id="delete-custom-event" class="btn-danger" type="button" hidden>Delete</button>
+          <div class="event-editor-footer">
+            <button id="event-editor-cancel" class="custom-cancel-btn" type="button">Cancel</button>
+            <button id="save-custom-event" class="btn-primary" type="button">Save event</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

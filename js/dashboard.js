@@ -52,10 +52,12 @@ let challengesData = {};
 let subjectsData = {};
 let timetableData = [];
 let holidayForecastData = [];
+let customEventsData = {};
 let currentUser = null;
 let userSettings = { language: 'en', timezone: 'Asia/Kolkata', sessionTimeout: '60', autoBackup: true, backupFrequency: 'weekly' };
 let sessionTimer;
 let googleCalendarEventMap = {};
+let activeCustomEventKey = null;
 let mfaFlow = { verificationId: null, active: false };
 let mfaRecaptchaVerifier = null;
 
@@ -121,6 +123,7 @@ function initDashboard() {
     });
     setupNavigation();
     setupCalendar();
+    setupCustomEventEditor();
     renderPlannerSidebar(selectedDate || new Date());
     setupModal();
     setupSettings();
@@ -155,6 +158,7 @@ async function loadUserData() {
             challengesData = data.challenges || {};
             subjectsData = data.subjects || {};
             timetableData = data.timetable || [];
+            customEventsData = data.customEvents || {};
             settings = data.settings || {};
         }
         renderPlannerSidebar(selectedDate || new Date());
@@ -427,6 +431,218 @@ function setupCalendar() {
     renderCalendar();
 }
 
+function setupCustomEventEditor() {
+    const modal = document.getElementById('event-editor-modal');
+    const closeBtn = document.getElementById('event-editor-close');
+    const cancelBtn = document.getElementById('event-editor-cancel');
+    const saveBtn = document.getElementById('save-custom-event');
+    const deleteBtn = document.getElementById('delete-custom-event');
+    const addBtn = document.getElementById('add-day-event');
+    const dateInput = document.getElementById('event-date-input');
+    const syncToggle = document.getElementById('sync-google-event-toggle');
+
+    modal?.addEventListener('click', (event) => {
+        if (event.target === modal) closeCustomEventEditor();
+    });
+    closeBtn?.addEventListener('click', closeCustomEventEditor);
+    cancelBtn?.addEventListener('click', closeCustomEventEditor);
+    saveBtn?.addEventListener('click', saveCustomEvent);
+    deleteBtn?.addEventListener('click', deleteCustomEvent);
+    addBtn?.addEventListener('click', () => openCustomEventEditor(selectedDate || new Date()));
+    dateInput?.addEventListener('change', () => {
+        if (!dateInput.value) return;
+        const event = customEventsData[dateInput.value];
+        if (event) populateCustomEventForm(event);
+    });
+    syncToggle?.addEventListener('change', () => {
+        if (!syncToggle.checked) return;
+        if (localStorage.getItem('bunkSmartGoogleConnected') !== 'true') {
+            showToast('Connect Google Calendar first to sync this event.', 'info');
+            syncToggle.checked = false;
+        }
+    });
+}
+
+async function saveCustomEvents() {
+    if (!auth.currentUser) return;
+    try {
+        const ref = doc(db, 'users', auth.currentUser.uid);
+        try {
+            await updateDoc(ref, { customEvents: customEventsData });
+        } catch (error) {
+            await setDoc(ref, { customEvents: customEventsData }, { merge: true });
+        }
+    } catch (error) {
+        console.error('Error saving custom events:', error);
+        showToast('Could not save this event. Please try again.', 'error');
+    }
+}
+
+function getCustomEventForDate(dateKey) {
+    return customEventsData[dateKey] || Object.values(customEventsData).find(item => item.date === dateKey) || null;
+}
+
+function populateCustomEventForm(event) {
+    const titleInput = document.getElementById('event-title-input');
+    const dateInput = document.getElementById('event-date-input');
+    const typeInput = document.getElementById('event-type-select');
+    const notesInput = document.getElementById('event-notes-input');
+    const syncToggle = document.getElementById('sync-google-event-toggle');
+    const deleteBtn = document.getElementById('delete-custom-event');
+    const titleEl = document.getElementById('event-editor-title');
+    const subtitleEl = document.getElementById('event-editor-subtitle');
+
+    if (titleInput) titleInput.value = event?.title || '';
+    if (dateInput) dateInput.value = event?.date || formatDate(selectedDate || new Date());
+    if (typeInput) typeInput.value = event?.type || 'event';
+    if (notesInput) notesInput.value = event?.notes || '';
+    if (syncToggle) syncToggle.checked = Boolean(event?.syncToGoogle);
+    if (deleteBtn) deleteBtn.hidden = !event;
+    if (titleEl) titleEl.textContent = event ? 'Edit event' : 'Plan an event';
+    if (subtitleEl) subtitleEl.textContent = event ? 'Update this day’s plan or send it to Google Calendar.' : 'Add a personal note, reminder, or calendar item.';
+}
+
+function openCustomEventEditor(date = new Date(), eventKey = null) {
+    const modal = document.getElementById('event-editor-modal');
+    const dateInput = document.getElementById('event-date-input');
+    const targetDate = formatDate(date);
+    activeCustomEventKey = eventKey || targetDate;
+    const existingEvent = getCustomEventForDate(targetDate);
+
+    if (modal) modal.hidden = false;
+    if (dateInput) dateInput.value = targetDate;
+    populateCustomEventForm(existingEvent);
+}
+
+function closeCustomEventEditor() {
+    const modal = document.getElementById('event-editor-modal');
+    if (modal) modal.hidden = true;
+    activeCustomEventKey = null;
+    const titleInput = document.getElementById('event-title-input');
+    const dateInput = document.getElementById('event-date-input');
+    const typeInput = document.getElementById('event-type-select');
+    const notesInput = document.getElementById('event-notes-input');
+    const syncToggle = document.getElementById('sync-google-event-toggle');
+    if (titleInput) titleInput.value = '';
+    if (dateInput) dateInput.value = '';
+    if (typeInput) typeInput.value = 'event';
+    if (notesInput) notesInput.value = '';
+    if (syncToggle) syncToggle.checked = false;
+    const deleteBtn = document.getElementById('delete-custom-event');
+    if (deleteBtn) deleteBtn.hidden = true;
+    const titleEl = document.getElementById('event-editor-title');
+    const subtitleEl = document.getElementById('event-editor-subtitle');
+    if (titleEl) titleEl.textContent = 'Plan an event';
+    if (subtitleEl) subtitleEl.textContent = 'Add a personal note, reminder, or calendar item.';
+}
+
+async function createGoogleCalendarEvent(eventRecord) {
+    const connected = localStorage.getItem('bunkSmartGoogleConnected') === 'true';
+    if (!connected) return null;
+    const response = await fetch(calendarEndpoint('create-event'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            title: eventRecord.title,
+            date: eventRecord.date,
+            notes: eventRecord.notes || '',
+            type: eventRecord.type || 'event',
+            eventId: eventRecord.googleEventId || null
+        })
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(json.error || 'Google Calendar sync failed');
+    return { eventId: json.eventId || null };
+}
+
+async function deleteGoogleCalendarEvent(eventId) {
+    const connected = localStorage.getItem('bunkSmartGoogleConnected') === 'true';
+    if (!connected || !eventId) return null;
+    const response = await fetch(calendarEndpoint('delete-event'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId })
+    });
+    if (!response.ok) throw new Error('Could not remove synced event');
+    return true;
+}
+
+async function saveCustomEvent() {
+    const titleInput = document.getElementById('event-title-input');
+    const dateInput = document.getElementById('event-date-input');
+    const typeInput = document.getElementById('event-type-select');
+    const notesInput = document.getElementById('event-notes-input');
+    const syncToggle = document.getElementById('sync-google-event-toggle');
+
+    const title = titleInput?.value.trim();
+    const dateKey = dateInput?.value || formatDate(selectedDate || new Date());
+    if (!title || !dateKey) {
+        showToast('Please add a title and date for this event.', 'warning');
+        return;
+    }
+
+    const previousEvent = getCustomEventForDate(dateKey);
+    const payload = {
+        date: dateKey,
+        title,
+        type: typeInput?.value || 'event',
+        notes: notesInput?.value.trim() || '',
+        syncToGoogle: Boolean(syncToggle?.checked)
+    };
+
+    if (previousEvent?.googleEventId) payload.googleEventId = previousEvent.googleEventId;
+    customEventsData[dateKey] = payload;
+    await saveCustomEvents();
+    renderCalendar();
+    renderPlannerSidebar(selectedDate || new Date());
+
+    if (payload.syncToGoogle) {
+        try {
+            const result = await createGoogleCalendarEvent(payload);
+            if (result?.eventId) {
+                customEventsData[dateKey].googleEventId = result.eventId;
+                await saveCustomEvents();
+                renderCalendar();
+            }
+            showToast('Event saved and synced to Google Calendar.', 'success');
+        } catch (error) {
+            console.error(error);
+            showToast('Event saved locally, but Google Calendar sync failed.', 'warning');
+        }
+    } else {
+        showToast('Event saved to your planner.', 'success');
+    }
+
+    closeCustomEventEditor();
+}
+
+async function deleteCustomEvent() {
+    const dateInput = document.getElementById('event-date-input');
+    const dateKey = dateInput?.value || formatDate(selectedDate || new Date());
+    const event = getCustomEventForDate(dateKey);
+    if (!event) {
+        closeCustomEventEditor();
+        return;
+    }
+
+    try {
+        if (event.googleEventId) {
+            await deleteGoogleCalendarEvent(event.googleEventId);
+        }
+    } catch (error) {
+        console.warn('Could not remove Google Calendar event:', error);
+    }
+
+    delete customEventsData[dateKey];
+    await saveCustomEvents();
+    renderCalendar();
+    renderPlannerSidebar(selectedDate || new Date());
+    closeCustomEventEditor();
+    showToast('Event removed.', 'info');
+}
+
 function renderPlannerSidebar(date = new Date()) {
     const plannerDate = document.getElementById('planner-date');
     const plannerList = document.getElementById('planner-day-list');
@@ -437,7 +653,8 @@ function renderPlannerSidebar(date = new Date()) {
 
     const dateKey = formatDate(date);
     const record = attendanceData[dateKey];
-    const relatedEvent = googleCalendarEventMap[dateKey] || holidayForecastData.find(item => item.date === dateKey && item.title && !attendanceData[dateKey]);
+    const customEvent = getCustomEventForDate(dateKey);
+    const relatedEvent = customEvent || googleCalendarEventMap[dateKey] || holidayForecastData.find(item => item.date === dateKey && item.title && !attendanceData[dateKey]);
     const isFuture = date > new Date();
 
     plannerDate.textContent = formatUserDate(date, {
@@ -456,7 +673,8 @@ function renderPlannerSidebar(date = new Date()) {
         items.push({ icon: record.status === 'present' ? '✅' : record.status === 'bunked' ? '❌' : '🏖️', label });
     }
     if (relatedEvent) {
-        items.push({ icon: '📅', label: relatedEvent.title || 'Calendar event' });
+        const label = customEvent ? `${customEvent.title} • ${customEvent.type}` : relatedEvent.title || 'Calendar event';
+        items.push({ icon: customEvent ? '🗓️' : '📅', label });
     }
     if (!items.length) {
         items.push({ icon: isFuture ? '🔒' : '•', label: isFuture ? 'Future date is locked' : 'No attendance details yet' });
@@ -468,6 +686,11 @@ function renderPlannerSidebar(date = new Date()) {
     plannerList.innerHTML = items.map(item => `<li><span>${item.icon}</span><span>${item.label}</span></li>`).join('');
 
     const upcomingEntries = [];
+    Object.entries(customEventsData)
+        .slice(0, 5)
+        .forEach(([key, event]) => {
+            upcomingEntries.push({ date: key, title: event.title || 'Custom event', kind: 'custom' });
+        });
     Object.entries(googleCalendarEventMap)
         .slice(0, 5)
         .forEach(([key, event]) => {
@@ -483,7 +706,7 @@ function renderPlannerSidebar(date = new Date()) {
     upcomingEntries.sort((a, b) => new Date(a.date) - new Date(b.date));
     const topUpcoming = upcomingEntries.slice(0, 5);
     upcomingList.innerHTML = topUpcoming.length
-        ? topUpcoming.map(item => `<li><span class="upcoming-badge ${item.kind}">${item.kind === 'holiday' ? '🏖️' : '📅'}</span><div><strong>${item.title}</strong><small>${formatUserDate(new Date(item.date + 'T00:00:00'), { month: 'short', day: 'numeric' })}</small></div></li>`).join('')
+        ? topUpcoming.map(item => `<li><span class="upcoming-badge ${item.kind}">${item.kind === 'holiday' ? '🏖️' : item.kind === 'custom' ? '🗓️' : '📅'}</span><div><strong>${item.title}</strong><small>${formatUserDate(new Date(item.date + 'T00:00:00'), { month: 'short', day: 'numeric' })}</small></div></li>`).join('')
         : '<li class="empty-upcoming">No upcoming events yet</li>';
 }
 
@@ -537,7 +760,8 @@ function renderCalendar() {
 
         const dateKey = formatDate(currentDateIter);
         const isCurrentMonth = currentDateIter.getMonth() === month;
-        const calendarEvent = googleCalendarEventMap[dateKey] || holidayForecastData.find(item => item.date === dateKey && item.title && !attendanceData[dateKey]);
+        const customEvent = getCustomEventForDate(dateKey);
+        const calendarEvent = customEvent || googleCalendarEventMap[dateKey] || holidayForecastData.find(item => item.date === dateKey && item.title && !attendanceData[dateKey]);
 
         if (!isCurrentMonth) {
             dayElement.classList.add('inactive');
@@ -552,7 +776,7 @@ function renderCalendar() {
                 }
             }
             if (calendarEvent) {
-                dayElement.classList.add('google-event');
+                dayElement.classList.add(customEvent ? 'custom-event' : 'google-event');
                 const eventLabel = calendarEvent.title || 'Calendar event';
                 const existingTitle = dayElement.title || '';
                 dayElement.title = existingTitle ? `${existingTitle} • ${eventLabel}` : eventLabel;
@@ -575,23 +799,29 @@ function renderCalendar() {
             }
 
             const dateCopy = new Date(currentDateIter);
-            if (dateCopy <= new Date()) {
+            const isFuture = dateCopy > new Date();
+            if (!isFuture) {
                 dayElement.addEventListener('click', () => {
                     selectedDate = dateCopy;
                     renderPlannerSidebar(dateCopy);
-                    openAttendanceModal(dateCopy);
+                    if (customEvent) {
+                        openCustomEventEditor(dateCopy, dateKey);
+                    } else {
+                        openAttendanceModal(dateCopy);
+                    }
                 });
             } else {
                 dayElement.classList.add('locked');
-                const futureHint = calendarEvent ? `${calendarEvent.title || 'Calendar event'} • future dates are read-only` : 'Future dates are locked';
+                const futureHint = calendarEvent ? `${calendarEvent.title || 'Calendar event'} • preview only` : 'Future date preview';
                 dayElement.title = futureHint;
                 dayElement.addEventListener('click', () => {
                     selectedDate = dateCopy;
                     renderPlannerSidebar(dateCopy);
-                    const message = calendarEvent
-                        ? `${calendarEvent.title || 'Calendar event'} is scheduled for this date. Attendance stays locked until the day arrives.`
-                        : 'This date is in the future. Attendance stays locked until the day arrives.';
-                    showToast(message, 'info');
+                    if (customEvent) {
+                        openCustomEventEditor(dateCopy, dateKey);
+                    } else {
+                        openAttendanceModal(dateCopy);
+                    }
                 });
             }
         }
@@ -645,8 +875,8 @@ function setupModal() {
 }
 
 function openAttendanceModal(date) {
-    if (date > new Date()) return;
     selectedDate = date;
+    const isFuture = date > new Date();
     if (selectedDateElement) {
         selectedDateElement.textContent = formatUserDate(date, {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -656,6 +886,16 @@ function openAttendanceModal(date) {
 
     const dateKey = formatDate(date);
     const existing = attendanceData[dateKey];
+    const helperText = document.getElementById('attendance-modal-hint');
+    if (helperText) {
+        helperText.textContent = isFuture
+            ? 'This day is in the future. You can preview it here, and it will unlock when the date arrives.'
+            : 'Choose a status, edit it, or clear it when needed.';
+    }
+
+    markPresentBtn.disabled = isFuture;
+    markBunkBtn.disabled = isFuture;
+    markHolidayBtn.disabled = isFuture;
 
     markPresentBtn.classList.remove('selected');
     markBunkBtn.classList.remove('selected');
@@ -665,30 +905,28 @@ function openAttendanceModal(date) {
     if (bunkActivityInput) bunkActivityInput.value = '';
     if (bunkMissedInput) bunkMissedInput.value = '';
     if (holidayTitleInput) holidayTitleInput.value = '';
-    // Save button is only needed for a holiday title.
     if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
-    if (clearAttendanceBtn) clearAttendanceBtn.hidden = !existing;
+    if (clearAttendanceBtn) clearAttendanceBtn.hidden = !existing || isFuture;
 
     if (existing) {
         if (existing.status === 'present') {
             markPresentBtn.classList.add('selected');
-            // Already present — just show state, no save button
-            if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
+            if (saveAttendanceBtn) saveAttendanceBtn.hidden = isFuture || true;
         } else if (existing.status === 'bunked') {
             markBunkBtn.classList.add('selected');
             bunkDetails.hidden = true;
             if (bunkActivityInput) bunkActivityInput.value = existing.activity || '';
             if (bunkMissedInput) bunkMissedInput.value = existing.missed || '';
-            if (saveAttendanceBtn) saveAttendanceBtn.hidden = true;
+            if (saveAttendanceBtn) saveAttendanceBtn.hidden = isFuture || true;
         } else if (existing.status === 'holiday') {
             markHolidayBtn?.classList.add('selected');
             if (holidayDetails) holidayDetails.hidden = false;
             if (holidayTitleInput) holidayTitleInput.value = existing.title || '';
-            if (saveAttendanceBtn) saveAttendanceBtn.hidden = false;
+            if (saveAttendanceBtn) saveAttendanceBtn.hidden = isFuture || false;
         }
     }
 
-    if (!existing) {
+    if (!existing && !isFuture) {
         const defaultAttendance = document.getElementById('default-attendance')?.value;
         if (defaultAttendance === 'present' || defaultAttendance === 'bunked') {
             attendanceModal.hidden = false;
@@ -710,7 +948,7 @@ function closeAttendanceModal() {
 async function saveAttendanceImmediate(status) {
     if (!selectedDate || !auth.currentUser) return;
     if (selectedDate > new Date()) {
-        showToast('Future dates are locked.', 'warning');
+        showToast('This day unlocks when it arrives. You can preview it now, but not mark it yet.', 'info');
         return;
     }
 
@@ -769,7 +1007,7 @@ async function clearAttendance() {
 async function saveAttendance() {
     if (!selectedDate || !auth.currentUser) return;
     if (selectedDate > new Date()) {
-        showToast('Future dates are locked.', 'warning');
+        showToast('This day unlocks when it arrives. You can preview it now, but not mark it yet.', 'info');
         return;
     }
 
@@ -2134,6 +2372,7 @@ async function clearAllData() {
         challengesData = {};
         subjectsData = {};
         timetableData = [];
+        customEventsData = {};
         updateStats(); renderCalendar(); loadInsights(); renderChallenges();
         renderSubjects(); renderTimetable(); renderTodayCommand(); renderHolidayForecast();
         showToast('🗑️ All data cleared.', 'info');
