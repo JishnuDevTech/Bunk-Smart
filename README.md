@@ -111,8 +111,8 @@ settings under **Environment variables**:
 ```env
 GOOGLE_CLIENT_ID=your_client_id
 GOOGLE_CLIENT_SECRET=your_client_secret
-GOOGLE_REDIRECT_URI=https://bunk-smart.netlify.app/.netlify/functions/google-callback
-FRONTEND_URL=https://bunk-smart.netlify.app
+GOOGLE_REDIRECT_URI=https://your-site.netlify.app/.netlify/functions/google-callback
+FRONTEND_URL=https://your-site.netlify.app
 SESSION_SECRET=your_long_random_secret
 ```
 
