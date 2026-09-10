@@ -328,6 +328,7 @@ body.theme-dark .forecast-strip { background: rgba(120, 53, 15, 0.18); }
 .command-btn:disabled { opacity: 0.6; cursor: default; }
 
 .forecast-strip { display: flex; gap: 0.65rem; align-items: stretch; overflow-x: auto; margin: 0 0 1.5rem; padding: 0.7rem; border: 1px dashed #f59e0b; border-radius: 0.75rem; background: rgba(255, 251, 235, 0.7); }
+.forecast-strip[hidden] { display: none; }
 .forecast-label { display: flex; align-items: center; color: #b45309; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; }
 .forecast-item { display: grid; gap: 0.1rem; min-width: 150px; padding: 0.5rem 0.7rem; border-left: 1px solid #fde68a; color: #78350f; font-size: 0.76rem; }
 .forecast-item b { color: #92400e; }
@@ -1198,6 +1199,7 @@ body.theme-dark .forecast-strip { background: rgba(120, 53, 15, 0.18); }
 .setting-info { flex: 1; }
 .setting-info label { display: block; font-weight: 600; font-size: 0.9rem; color: var(--text); cursor: pointer; margin-bottom: 0.125rem; }
 .setting-hint { font-size: 0.775rem; color: var(--muted); }
+.mfa-recaptcha { margin: 0 1.75rem 1rem; }
 
 .setting-control { flex-shrink: 0; }
 

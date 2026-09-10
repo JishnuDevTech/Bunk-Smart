@@ -1,13 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1095 1095" width="1095" height="1095" role="img" aria-labelledby="title desc">
   <title id="title">Bunk Smart</title>
-  <desc id="desc">A calendar with a check mark and lightning bolt</desc>
+  <desc id="desc">Bunk Smart calendar mark with an attendance check and smart spark</desc>
   <defs>
-    <linearGradient id="blue" x1="0" x2="1" y1="0" y2="1">
-      <stop stop-color="#2563eb"/><stop offset="1" stop-color="#0f3cae"/>
+    <linearGradient id="markBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#055de9"/><stop offset="1" stop-color="#04237d"/>
+    </linearGradient>
+    <linearGradient id="markCyan" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#039df5"/><stop offset="1" stop-color="#06cbf8"/>
     </linearGradient>
   </defs>
-  <rect x="8" y="12" width="80" height="72" rx="18" fill="url(#blue)"/>
-  <path d="M25 31h46M29 22v17M67 22v17" fill="none" stroke="#fff" stroke-linecap="round" stroke-width="6"/>
-  <path d="m27 55 10 10 19-21" fill="none" stroke="#34d399" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
-  <path d="m66 45-9 15h8l-8 14 18-20h-8z" fill="#fbbf24"/>
+  <rect x="132" y="132" width="831" height="831" rx="210" fill="url(#markBlue)"/>
+  <path d="M300 360h495M350 270v150M745 270v150" fill="none" stroke="#fff" stroke-linecap="round" stroke-width="62"/>
+  <path d="M286 472c0-62 50-112 112-112h299c62 0 112 50 112 112v270c0 62-50 112-112 112H398c-62 0-112-50-112-112z" fill="none" stroke="#fff" stroke-width="34"/>
+  <path d="m354 635 94 94 190-207" fill="none" stroke="#34d399" stroke-linecap="round" stroke-linejoin="round" stroke-width="72"/>
+  <path d="m735 483-94 166h83l-84 149 190-213h-84z" fill="url(#markCyan)"/>
 </svg>

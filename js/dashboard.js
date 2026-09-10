@@ -1,7 +1,7 @@
 // ===== DASHBOARD.JS =====
 import { auth, db } from './firebase.js';
 import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js';
-import { onAuthStateChanged, updateProfile } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js';
+import { onAuthStateChanged, updateProfile, multiFactor, PhoneAuthProvider, PhoneMultiFactorGenerator, RecaptchaVerifier } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js';
 
 const CALENDAR_API_BASE = localStorage.getItem('bunkSmartCalendarApi') || '/.netlify/functions';
 const calendarEndpoint = action => CALENDAR_API_BASE.includes('/.netlify/functions')
@@ -832,16 +832,64 @@ function exportToPDF() {
     }
     const { jsPDF } = window.jspdf;
     const docPdf = new jsPDF();
-    docPdf.setFontSize(16);
-    docPdf.text('Bunk Smart Attendance Report', 20, 20);
+    const pageWidth = docPdf.internal.pageSize.getWidth();
+    const pageHeight = docPdf.internal.pageSize.getHeight();
+    const metrics = getMonthMetrics(currentDate.getFullYear(), currentDate.getMonth());
+    docPdf.setFillColor(15, 60, 174);
+    docPdf.rect(0, 0, pageWidth, 34, 'F');
+    docPdf.setFillColor(52, 211, 153);
+    docPdf.roundedRect(18, 9, 16, 16, 3, 3, 'F');
+    docPdf.setTextColor(255, 255, 255);
+    docPdf.setFontSize(20);
+    docPdf.setFont(undefined, 'bold');
+    docPdf.text('Bunk Smart', 42, 20);
+    docPdf.setFontSize(9);
+    docPdf.setFont(undefined, 'normal');
+    docPdf.text('Attendance report', 42, 27);
+    docPdf.setTextColor(17, 24, 39);
+    docPdf.setFontSize(15);
+    docPdf.setFont(undefined, 'bold');
+    docPdf.text(formatUserDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1), { month: 'long', year: 'numeric' }), 18, 49);
+    docPdf.setFontSize(10);
+    docPdf.setFont(undefined, 'normal');
+    docPdf.setTextColor(107, 114, 128);
+    docPdf.text(`Generated ${formatUserDate(new Date(), { dateStyle: 'medium' })}`, 18, 57);
+    const summary = [['Attendance rate', `${metrics.attendanceRate}%`], ['Present days', `${metrics.presentCount}`], ['Bunk days', `${metrics.bunkCount}`], ['Day streak', `${metrics.currentStreak}`]];
+    summary.forEach(([label, value], index) => {
+        const x = 18 + (index % 2) * 88;
+        const y = 70 + Math.floor(index / 2) * 25;
+        docPdf.setFillColor(241, 245, 249);
+        docPdf.roundedRect(x, y, 78, 18, 2, 2, 'F');
+        docPdf.setTextColor(37, 99, 235);
+        docPdf.setFontSize(13);
+        docPdf.setFont(undefined, 'bold');
+        docPdf.text(value, x + 5, y + 8);
+        docPdf.setTextColor(107, 114, 128);
+        docPdf.setFontSize(8);
+        docPdf.setFont(undefined, 'normal');
+        docPdf.text(label, x + 5, y + 14);
+    });
+    let y = 128;
+    docPdf.setTextColor(17, 24, 39);
     docPdf.setFontSize(11);
-    let y = 40;
+    docPdf.setFont(undefined, 'bold');
+    docPdf.text('Daily record', 18, y);
+    y += 8;
     Object.keys(attendanceData).sort().forEach(dateKey => {
         const att = attendanceData[dateKey];
-        docPdf.text(`${dateKey}: ${att.status}${att.activity ? ' | Did: ' + att.activity : ''}${att.missed ? ' | Missed: ' + att.missed : ''}`, 20, y);
-        y += 10;
-        if (y > 280) { docPdf.addPage(); y = 20; }
+        if (y > pageHeight - 22) { docPdf.addPage(); y = 22; }
+        docPdf.setFillColor(att.status === 'present' ? 220 : att.status === 'bunked' ? 254 : 254, att.status === 'present' ? 252 : att.status === 'bunked' ? 226 : 243, att.status === 'present' ? 231 : att.status === 'bunked' ? 226 : 199);
+        docPdf.roundedRect(18, y - 5, pageWidth - 36, 13, 2, 2, 'F');
+        docPdf.setTextColor(17, 24, 39);
+        docPdf.setFontSize(9);
+        docPdf.setFont(undefined, 'normal');
+        const label = att.status === 'holiday' ? `Holiday: ${att.title || 'Holiday'}` : att.status[0].toUpperCase() + att.status.slice(1);
+        docPdf.text(`${dateKey}    ${label}`, 23, y + 3);
+        y += 17;
     });
+    docPdf.setTextColor(148, 163, 184);
+    docPdf.setFontSize(8);
+    docPdf.text('Bunk Smart | Owned and developed by Jishnu Rahegaonkar', 18, pageHeight - 10);
     docPdf.save('bunk-smart-attendance.pdf');
     showToast('📄 PDF exported successfully!', 'success');
 }
@@ -1258,6 +1306,10 @@ function setupSettings() {
         el.addEventListener(event, async (e) => {
             const val = type === 'checkbox' ? e.target.checked : e.target.value;
             userSettings[key] = val;
+            if (id === 'two-factor') {
+                await handleTwoFactorToggle(val);
+                return;
+            }
             await saveSetting(key, val);
             if (onChange) onChange(val);
             if (id === 'email-notifications' || id === 'push-notifications') {
@@ -1433,8 +1485,7 @@ async function fetchHolidaySuggestions() {
     try {
         const year = new Date().getFullYear();
         const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/${country}`);
-        if (!response.ok) throw new Error('Holiday service unavailable');
-        const holidays = await response.json();
+        const holidays = response.ok ? await response.json() : getHolidayFallback(country, year);
         const suggestions = holidays.filter(holiday => !attendanceData[holiday.date]);
         holidayForecastData = suggestions.map(holiday => ({ date: holiday.date, title: holiday.localName || holiday.name }));
         await saveSetting('holidayForecast', holidayForecastData);
@@ -1452,8 +1503,30 @@ async function fetchHolidaySuggestions() {
             button.disabled = true;
         }));
     } catch (error) {
-        container.innerHTML = '<p class="smart-empty">Holiday suggestions are unavailable right now. You can still upload your college calendar.</p>';
+        const fallback = getHolidayFallback(country, new Date().getFullYear());
+        holidayForecastData = fallback.map(holiday => ({ date: holiday.date, title: holiday.localName || holiday.name }));
+        await saveSetting('holidayForecast', holidayForecastData);
+        renderHolidayForecast();
+        container.hidden = false;
+        container.innerHTML = `<p class="smart-empty">Live holiday service is unavailable. Showing common ${country} holidays as optional suggestions.</p>${fallback.map(holiday => `<div class="recommendation-row"><span><strong>${holiday.date}</strong> ${holiday.localName || holiday.name}</span><button class="btn-add-holiday" data-date="${holiday.date}" data-title="${holiday.localName || holiday.name}">Add</button></div>`).join('')}`;
+        container.querySelectorAll('.btn-add-holiday').forEach(button => button.addEventListener('click', async () => {
+            const dateKey = button.dataset.date;
+            await persistAttendanceRecord(dateKey, { date: `${dateKey}T00:00:00.000Z`, status: 'holiday', title: button.dataset.title });
+            button.textContent = 'Added';
+            button.disabled = true;
+        }));
     }
+}
+
+function getHolidayFallback(country, year) {
+    if (country !== 'IN') return [];
+    return [
+        { date: `${year}-01-26`, localName: 'Republic Day' },
+        { date: `${year}-05-01`, localName: 'Maharashtra Day' },
+        { date: `${year}-08-15`, localName: 'Independence Day' },
+        { date: `${year}-10-02`, localName: 'Gandhi Jayanti' },
+        { date: `${year}-12-25`, localName: 'Christmas Day' }
+    ];
 }
 
 function detectLocation() {
@@ -1581,14 +1654,45 @@ async function saveSetting(key, value) {
     }
 }
 
-function handleTwoFactorToggle(enabled) {
+async function handleTwoFactorToggle(enabled) {
     const toggle = document.getElementById('two-factor');
-    if (enabled) {
-        if (toggle) toggle.checked = false;
-        saveSetting('twoFactor', false);
-        showToast('Two-factor enrollment needs a Firebase Auth setup flow first.', 'info', 3500);
-    } else {
+    if (!enabled) {
+        if (auth.currentUser?.multiFactor?.enrolledFactors?.length) {
+            showToast('Remove the enrolled factor from your Firebase account security flow.', 'info', 3500);
+            if (toggle) toggle.checked = true;
+            return;
+        }
+        await saveSetting('twoFactor', false);
         showToast('Two-factor preference disabled.', 'info', 2000);
+        return;
+    }
+    if (!auth.currentUser) return;
+    const phoneNumber = window.prompt('Enter your phone number with country code, for example +919876543210');
+    if (!phoneNumber) { if (toggle) toggle.checked = false; return; }
+    const container = document.getElementById('mfa-recaptcha');
+    if (container) container.hidden = false;
+    let verifier;
+    try {
+        verifier = new RecaptchaVerifier(auth, 'mfa-recaptcha', { size: 'normal' });
+        const session = await multiFactor(auth.currentUser).getSession();
+        const provider = new PhoneAuthProvider(auth);
+        const verificationId = await provider.verifyPhoneNumber({ phoneNumber, session }, verifier);
+        const code = window.prompt('Enter the SMS verification code');
+        if (!code) throw new Error('Verification cancelled');
+        const credential = PhoneAuthProvider.credential(verificationId, code);
+        await multiFactor(auth.currentUser).enroll(PhoneMultiFactorGenerator.assertion(credential), 'Bunk Smart phone');
+        await saveSetting('twoFactor', true);
+        showToast('🔐 Two-factor authentication enabled.', 'success', 4000);
+    } catch (error) {
+        if (toggle) toggle.checked = false;
+        await saveSetting('twoFactor', false);
+        const message = error.code === 'auth/requires-recent-login'
+            ? 'Please sign out and sign in again before enabling two-factor authentication.'
+            : error.message || 'Two-factor enrollment failed.';
+        showToast(message, 'warning', 5000);
+    } finally {
+        verifier?.clear();
+        if (container) container.hidden = true;
     }
 }
 
