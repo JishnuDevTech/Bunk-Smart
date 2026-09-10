@@ -84,8 +84,6 @@
         <div class="today-actions"><button id="today-present" class="command-btn command-present">Present</button><button id="today-bunk" class="command-btn command-bunk">Bunk</button><button id="today-holiday" class="command-btn command-holiday">Holiday</button><button id="today-clear" class="command-btn command-clear">Clear</button></div>
       </div>
 
-      <div class="forecast-strip" id="holiday-forecast" hidden></div>
-
       <div class="stats-cards">
         <div class="stat-card">
           <div class="stat-icon">📊</div>
@@ -947,6 +945,8 @@
           <label for="mfa-phone-number">Phone</label>
           <input type="tel" id="mfa-phone-number" placeholder="9876543210" inputmode="tel" />
         </div>
+
+        <div id="mfa-recaptcha" class="mfa-recaptcha" hidden></div>
 
         <button class="mfa-primary-btn" id="mfa-send-code">Send SMS code</button>
 

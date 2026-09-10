@@ -307,19 +307,10 @@ function renderTimetable() {
 
 function renderHolidayForecast() {
     const container = document.getElementById('holiday-forecast');
-    if (!container) return;
-    const today = new Date();
-    const recorded = Object.entries(attendanceData)
-        .filter(([key, record]) => record.status === 'holiday' && new Date(`${key}T00:00:00`) > today)
-        .map(([date, record]) => ({ date, title: record.title || 'Holiday' }));
-    const manualOnly = [...recorded].sort((a, b) => a.date.localeCompare(b));
-    const imported = holidayForecastData
-        .filter(item => item.date && !attendanceData[item.date])
-        .filter(item => !manualOnly.some(existing => existing.date === item.date));
-    const upcoming = [...manualOnly, ...imported].sort((a, b) => a.date.localeCompare(b)).slice(0, 3);
-    if (!upcoming.length) { container.hidden = true; return; }
-    container.hidden = false;
-    container.innerHTML = `<span class="forecast-label">UPCOMING</span>${upcoming.map(item => `<span class="forecast-item"><b>${formatUserDate(new Date(`${item.date}T00:00:00`), { month: 'short', day: 'numeric' })}</b>${item.title}<small>Marked by you</small></span>`).join('')}`;
+    if (container) {
+        container.hidden = true;
+        container.innerHTML = '';
+    }
 }
 
 function applyGoogleCalendarState(connected, eventCount = 0) {
@@ -335,6 +326,7 @@ function applyGoogleCalendarState(connected, eventCount = 0) {
     if (connectButton) {
         connectButton.textContent = isConnected ? 'Connected' : 'Connect';
         connectButton.disabled = isConnected;
+        connectButton.classList.toggle('is-connected', isConnected);
     }
     if (disconnectButton) {
         disconnectButton.hidden = !isConnected;
@@ -1744,7 +1736,16 @@ async function requestReminderPermission() {
 
 function updateNotificationStatus() {
     const status = document.getElementById('notification-status');
-    if (status && 'Notification' in window) status.textContent = `Browser permission: ${Notification.permission}`;
+    const button = document.getElementById('enable-reminders');
+    if (status && 'Notification' in window) {
+        const isGranted = Notification.permission === 'granted';
+        status.textContent = `Browser permission: ${Notification.permission}`;
+        if (button) {
+            button.textContent = isGranted ? 'Enabled' : 'Enable';
+            button.disabled = isGranted;
+            button.classList.toggle('is-enabled', isGranted);
+        }
+    }
 }
 
 let reminderTimer;
@@ -1820,10 +1821,15 @@ function setupMfaModal() {
         try {
             if (mfaRecaptchaVerifier) clearMfaRecaptchaVerifier();
             const recaptchaContainer = document.getElementById('mfa-recaptcha');
-            if (recaptchaContainer) recaptchaContainer.hidden = false;
+            if (recaptchaContainer) {
+                recaptchaContainer.hidden = false;
+                recaptchaContainer.innerHTML = '';
+            }
             mfaRecaptchaVerifier = new RecaptchaVerifier(auth, 'mfa-recaptcha', {
-                size: 'invisible',
-                callback: () => {},
+                size: 'normal',
+                callback: () => {
+                    console.log('MFA reCAPTCHA solved');
+                },
                 'expired-callback': () => {
                     showToast('The verification challenge expired. Please try again.', 'warning');
                 }
