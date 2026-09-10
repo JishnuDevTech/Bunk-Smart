@@ -236,10 +236,44 @@ function renderTodayCommand() {
     renderDailyFocus();
 }
 
-function getSmartAlerts() {
-    const target = Math.min(100, Math.max(1, Number(document.getElementById('smart-target')?.value || 75)));
+function getEffectiveSmartTarget() {
+    const rawValue = Number(userSettings.smartTarget ?? document.getElementById('smart-target')?.value ?? 75);
+    const value = Number.isFinite(rawValue) ? rawValue : 75;
+    return Math.min(100, Math.max(1, value));
+}
+
+function getCurrentAttendanceSnapshot() {
     const now = new Date();
     const monthStats = getMonthMetrics(now.getFullYear(), now.getMonth());
+    const target = getEffectiveSmartTarget();
+    const totalMarked = Math.max(0, monthStats.presentCount + monthStats.bunkCount);
+    const currentRate = totalMarked > 0 ? Math.round((monthStats.presentCount / totalMarked) * 100) : 0;
+    let remainingOpenDays = 0;
+
+    for (let cursor = new Date(now); cursor.getMonth() === now.getMonth(); cursor.setDate(cursor.getDate() + 1)) {
+        const key = formatDate(cursor);
+        if (attendanceData[key] || cursor.getTime() < now.getTime()) continue;
+        if (isWorkingDay(cursor)) remainingOpenDays++;
+    }
+
+    const requiredMore = totalMarked > 0
+        ? Math.max(0, Math.ceil(((target / 100) * (totalMarked + remainingOpenDays)) - monthStats.presentCount))
+        : 0;
+
+    return {
+        target,
+        currentRate,
+        presentCount: monthStats.presentCount,
+        bunkCount: monthStats.bunkCount,
+        totalMarked,
+        remainingOpenDays,
+        requiredMore
+    };
+}
+
+function getSmartAlerts() {
+    const now = new Date();
+    const snapshot = getCurrentAttendanceSnapshot();
     const todayRecord = attendanceData[todayKey()];
     const alerts = [];
 
@@ -254,26 +288,28 @@ function getSmartAlerts() {
         alerts.push({
             type: 'success',
             icon: '🎉',
-            title: `Tomorrow is a holiday — your planner is cleared.`,
-            detail: todayRecord.title || 'Holiday recorded.'
+            title: 'Holiday recorded for today.',
+            detail: todayRecord.title || 'Your planner is clear for this day.'
         });
     }
 
-    const attendanceRate = monthStats.totalCount ? Math.round((monthStats.presentCount / monthStats.totalCount) * 100) : 0;
-    if (attendanceRate < target) {
-        const needed = Math.max(1, Math.ceil((target * Math.max(monthStats.totalCount || 1, 1)) / 100) - monthStats.presentCount);
+    if (snapshot.currentRate < snapshot.target) {
+        const detailText = snapshot.requiredMore > 0
+            ? `You need ${snapshot.requiredMore} more attended class${snapshot.requiredMore === 1 ? '' : 'es'} to hit ${snapshot.target}%.`
+            : `You are still below ${snapshot.target}% with the current month data.`;
+
         alerts.push({
             type: 'alert',
             icon: '📉',
-            title: `Your attendance is below ${target}% this month.`,
-            detail: `You need ${needed} more attended class${needed === 1 ? '' : 'es'} to reach your target.`
+            title: `Your month is below ${snapshot.target}% target.`,
+            detail: detailText
         });
     } else {
         alerts.push({
             type: 'success',
             icon: '✅',
-            title: `You are on pace for ${target}% attendance.`,
-            detail: `Current month rate: ${attendanceRate}%.`
+            title: `You are tracking above ${snapshot.target}% target.`,
+            detail: `Current month rate: ${snapshot.currentRate}%.`
         });
     }
 
@@ -299,7 +335,7 @@ function getSmartAlerts() {
         alerts.push({
             type: 'info',
             icon: '⏰',
-            title: `You have ${pendingWeek} pending class${pendingWeek === 1 ? '' : 'es'} this week.`,
+            title: `You have ${pendingWeek} class${pendingWeek === 1 ? '' : 'es'} in your week.`,
             detail: 'Use the timetable to stay ahead of your routine.'
         });
     }
@@ -2040,18 +2076,12 @@ function isWorkingDay(date) {
 function renderSmartInsights() {
     const container = document.getElementById('smart-insights');
     if (!container) return;
-    const target = Math.min(100, Math.max(1, Number(document.getElementById('smart-target')?.value || 75))) / 100;
-    const now = new Date();
-    const metrics = getMonthMetrics(now.getFullYear(), now.getMonth());
-    const tracked = metrics.presentCount + metrics.bunkCount;
-    let remainingWorkingDays = 0;
-    for (let cursor = new Date(now); cursor.getMonth() === now.getMonth(); cursor.setDate(cursor.getDate() + 1)) {
-        const key = formatDate(cursor);
-        if (cursor > now && isWorkingDay(cursor) && !attendanceData[key]) remainingWorkingDays++;
-    }
-    const projectedRate = tracked + remainingWorkingDays > 0
-        ? Math.round(((metrics.presentCount + remainingWorkingDays) / (tracked + remainingWorkingDays)) * 100) : 0;
-    const safeBunks = tracked > 0 ? Math.max(0, Math.floor(metrics.presentCount / target - tracked)) : 0;
+
+    const snapshot = getCurrentAttendanceSnapshot();
+    const targetRatio = snapshot.target / 100;
+    const projectedRate = snapshot.totalMarked + snapshot.remainingOpenDays > 0
+        ? Math.round(((snapshot.presentCount + Math.min(snapshot.remainingOpenDays, snapshot.requiredMore)) / (snapshot.totalMarked + snapshot.remainingOpenDays)) * 100)
+        : snapshot.currentRate;
 
     const weekdayTotals = {};
     Object.entries(attendanceData).forEach(([key, record]) => {
@@ -2062,11 +2092,15 @@ function renderSmartInsights() {
         if (record.status === 'present') weekdayTotals[weekday].present++;
     });
     const weakestDay = Object.entries(weekdayTotals).sort(([, a], [, b]) => (a.present / a.total) - (b.present / b.total))[0];
-    const pattern = weakestDay ? `${weakestDay[0]} is your weakest day at ${Math.round(weakestDay[1].present / weakestDay[1].total * 100)}%.` : 'Mark a few days to unlock attendance patterns.';
+    const pattern = weakestDay ? `${weakestDay[0]} is your weakest day at ${Math.round((weakestDay[1].present / weakestDay[1].total) * 100)}%.` : 'Mark a few days to unlock attendance patterns.';
+
+    const safeBunks = snapshot.totalMarked > 0
+        ? Math.max(0, Math.ceil((snapshot.target * (snapshot.totalMarked + snapshot.remainingOpenDays)) / 100 - snapshot.presentCount))
+        : 0;
 
     container.innerHTML = `
-      <div class="smart-insight"><strong>Safe-bunk estimate</strong><span>${safeBunks} day${safeBunks === 1 ? '' : 's'} at or above ${Math.round(target * 100)}%</span></div>
-      <div class="smart-insight"><strong>Month forecast</strong><span>${projectedRate}% if you attend the remaining ${remainingWorkingDays} working day${remainingWorkingDays === 1 ? '' : 's'}</span></div>
+      <div class="smart-insight"><strong>Required now</strong><span>${snapshot.requiredMore} more present class${snapshot.requiredMore === 1 ? '' : 'es'} to reach ${snapshot.target}%</span></div>
+      <div class="smart-insight"><strong>Month forecast</strong><span>${projectedRate}% if you attend the next ${snapshot.remainingOpenDays} working day${snapshot.remainingOpenDays === 1 ? '' : 's'}</span></div>
       <div class="smart-insight"><strong>Pattern insight</strong><span>${pattern}</span></div>
       <div class="smart-insight"><strong>Task rhythm</strong><span>${timetableData.length ? `${timetableData.length} class blocks are in your planner.` : 'Add your timetable to unlock the academic planner.'}</span></div>`;
 }
