@@ -237,9 +237,14 @@ function renderTodayCommand() {
 }
 
 function getEffectiveSmartTarget() {
-    const rawValue = Number(userSettings.smartTarget ?? document.getElementById('smart-target')?.value ?? 75);
-    const value = Number.isFinite(rawValue) ? rawValue : 75;
-    return Math.min(100, Math.max(1, value));
+    const inputValue = Number(document.getElementById('smart-target')?.value);
+    const savedValue = Number(userSettings.smartTarget);
+    const rawValue = Number.isFinite(inputValue) && inputValue > 0
+        ? inputValue
+        : Number.isFinite(savedValue) && savedValue > 0
+            ? savedValue
+            : 75;
+    return Math.min(100, Math.max(1, rawValue));
 }
 
 function getCurrentAttendanceSnapshot() {
@@ -384,7 +389,7 @@ function renderGoalProgress() {
     const attendanceRate = monthStats.totalCount ? Math.round((monthStats.presentCount / monthStats.totalCount) * 100) : 0;
     const streak = Number(document.getElementById('streak')?.textContent || 0);
     const habitScore = Math.min(100, Math.round((attendanceRate * 0.7) + (streak * 2.5)));
-    const target = Number(document.getElementById('smart-target')?.value || 75);
+    const target = getEffectiveSmartTarget();
 
     container.innerHTML = `
         <div class="goal-ring-wrap">
