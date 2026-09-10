@@ -57,6 +57,24 @@ let userSettings = { language: 'en', timezone: 'Asia/Kolkata', sessionTimeout: '
 let sessionTimer;
 let googleCalendarEventMap = {};
 let mfaFlow = { verificationId: null, active: false };
+let mfaRecaptchaVerifier = null;
+
+function clearMfaRecaptchaVerifier() {
+    if (!mfaRecaptchaVerifier) return;
+    try {
+        if (typeof mfaRecaptchaVerifier.clear === 'function') {
+            mfaRecaptchaVerifier.clear();
+        }
+    } catch (error) {
+        console.warn('MFA recaptcha cleanup warning:', error);
+    }
+    mfaRecaptchaVerifier = null;
+    const container = document.getElementById('mfa-recaptcha');
+    if (container) {
+        container.innerHTML = '';
+        container.hidden = true;
+    }
+}
 
 // ─── TOAST NOTIFICATION SYSTEM ───────────────────────────────────────────────
 function showToast(message, type = 'success', duration = 3500) {
@@ -1786,6 +1804,7 @@ function setupMfaModal() {
     };
 
     const closeMfaModal = () => {
+        clearMfaRecaptchaVerifier();
         if (modal) modal.hidden = true;
         if (toggle) toggle.checked = false;
         mfaFlow = { verificationId: null, active: false };
@@ -1799,14 +1818,26 @@ function setupMfaModal() {
             return;
         }
         try {
+            if (mfaRecaptchaVerifier) clearMfaRecaptchaVerifier();
+            const recaptchaContainer = document.getElementById('mfa-recaptcha');
+            if (recaptchaContainer) recaptchaContainer.hidden = false;
+            mfaRecaptchaVerifier = new RecaptchaVerifier(auth, 'mfa-recaptcha', {
+                size: 'invisible',
+                callback: () => {},
+                'expired-callback': () => {
+                    showToast('The verification challenge expired. Please try again.', 'warning');
+                }
+            });
+
             const provider = new PhoneAuthProvider(auth);
             const session = await multiFactor(auth.currentUser).getSession();
-            mfaFlow.verificationId = await provider.verifyPhoneNumber({ phoneNumber: phone, session }, { type: 'recaptcha', size: 'invisible' });
+            mfaFlow.verificationId = await provider.verifyPhoneNumber({ phoneNumber: phone, session }, mfaRecaptchaVerifier);
             mfaFlow.active = true;
             if (codeRow) codeRow.hidden = false;
             if (verifyButton) verifyButton.hidden = false;
             showToast('SMS code sent. Finish verification to enable 2FA.', 'success');
         } catch (error) {
+            clearMfaRecaptchaVerifier();
             console.error(error);
             showToast(error.message || 'SMS could not be sent. Please try again.', 'warning');
         }
@@ -1822,11 +1853,13 @@ function setupMfaModal() {
             const credential = PhoneAuthProvider.credential(mfaFlow.verificationId, code);
             await multiFactor(auth.currentUser).enroll(PhoneMultiFactorGenerator.assertion(credential), 'Bunk Smart phone');
             await saveSetting('twoFactor', true);
+            clearMfaRecaptchaVerifier();
             if (modal) modal.hidden = true;
             if (toggle) toggle.checked = true;
             showToast('🔐 Two-factor authentication enabled.', 'success', 4000);
             mfaFlow = { verificationId: null, active: false };
         } catch (error) {
+            clearMfaRecaptchaVerifier();
             console.error(error);
             if (toggle) toggle.checked = false;
             await saveSetting('twoFactor', false);

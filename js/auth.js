@@ -17,6 +17,22 @@ import { db } from './firebase.js';
 
 const LEGAL_VERSION = '2026-09-10-v1';
 
+function resetRecaptchaVerifier(verifier) {
+  if (!verifier) return;
+  try {
+    if (typeof verifier.clear === 'function') {
+      verifier.clear();
+    }
+  } catch (error) {
+    console.warn('Recaptcha cleanup warning:', error);
+  }
+  const container = document.getElementById('mfa-signin-recaptcha');
+  if (container) {
+    container.innerHTML = '';
+    container.hidden = true;
+  }
+}
+
 // Function to get user-friendly error messages
 function getFriendlyErrorMessage(error) {
   const errorCode = error.code;
@@ -100,11 +116,17 @@ async function resolveMfaSignIn(error) {
   const resolver = getMultiFactorResolver(auth, error);
   const hint = resolver.hints.find(item => item.factorId === PhoneMultiFactorGenerator.FACTOR_ID);
   if (!hint) throw new Error('No supported phone factor is enrolled.');
+
   const container = document.getElementById('mfa-signin-recaptcha');
   if (container) container.hidden = false;
-  let verifier;
+
+  let verifier = null;
   try {
-    verifier = new RecaptchaVerifier(auth, 'mfa-signin-recaptcha', { size: 'normal' });
+    verifier = new RecaptchaVerifier(auth, 'mfa-signin-recaptcha', {
+      size: 'normal',
+      callback: () => {},
+      'expired-callback': () => {}
+    });
     const provider = new PhoneAuthProvider(auth);
     const verificationId = await provider.verifyPhoneNumber({ multiFactorHint: hint, session: resolver.session }, verifier);
     const code = window.prompt('Enter the SMS verification code');
@@ -113,8 +135,7 @@ async function resolveMfaSignIn(error) {
     const result = await resolver.resolveSignIn(PhoneMultiFactorGenerator.assertion(credential));
     return result.user;
   } finally {
-    verifier?.clear();
-    if (container) container.hidden = true;
+    resetRecaptchaVerifier(verifier);
   }
 }
 
