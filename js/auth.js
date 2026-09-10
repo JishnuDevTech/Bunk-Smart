@@ -6,7 +6,11 @@ import {
   sendPasswordResetEmail,
   signInWithPopup,
   GoogleAuthProvider,
-  GithubAuthProvider
+  GithubAuthProvider,
+  getMultiFactorResolver,
+  PhoneAuthProvider,
+  PhoneMultiFactorGenerator,
+  RecaptchaVerifier
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
 import { doc, setDoc } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js';
 import { db } from './firebase.js';
@@ -83,6 +87,35 @@ async function saveInitialLegalConsent(user) {
       legalVersion: LEGAL_VERSION
     }
   }, { merge: true });
+}
+
+async function completeSignIn(user) {
+  alert(`Welcome back, ${user.displayName || user.email || 'back'}!`);
+  localStorage.setItem("loggedInUser", user.email || user.uid);
+  window.location.href = "dashboard.html";
+}
+
+async function resolveMfaSignIn(error) {
+  if (error.code !== 'auth/multi-factor-auth-required') throw error;
+  const resolver = getMultiFactorResolver(auth, error);
+  const hint = resolver.hints.find(item => item.factorId === PhoneMultiFactorGenerator.FACTOR_ID);
+  if (!hint) throw new Error('No supported phone factor is enrolled.');
+  const container = document.getElementById('mfa-signin-recaptcha');
+  if (container) container.hidden = false;
+  let verifier;
+  try {
+    verifier = new RecaptchaVerifier(auth, 'mfa-signin-recaptcha', { size: 'normal' });
+    const provider = new PhoneAuthProvider(auth);
+    const verificationId = await provider.verifyPhoneNumber({ multiFactorHint: hint, session: resolver.session }, verifier);
+    const code = window.prompt('Enter the SMS verification code');
+    if (!code) throw new Error('Verification cancelled');
+    const credential = PhoneAuthProvider.credential(verificationId, code);
+    const result = await resolver.resolveSignIn(PhoneMultiFactorGenerator.assertion(credential));
+    return result.user;
+  } finally {
+    verifier?.clear();
+    if (container) container.hidden = true;
+  }
 }
 
 // Password visibility toggles (only if elements exist)
@@ -163,18 +196,15 @@ if (loginForm) {
     const password = loginPasswordInput.value;
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password).catch(async error => ({ user: await resolveMfaSignIn(error) }));
       console.log("Logged in:", userCredential.user);
-      alert(`Welcome back, ${userCredential.user.displayName || userCredential.user.email}!`);
       // Close modal
       const authModal = document.getElementById('auth-modal');
       if (authModal) {
         authModal.classList.remove('show');
         document.body.classList.remove('auth-modal-active');
       }
-      // Set user as logged in for guard.js
-      localStorage.setItem("loggedInUser", userCredential.user.email);
-      window.location.href = "dashboard.html";
+      await completeSignIn(userCredential.user);
     } catch (error) {
       console.error("Login error:", error);
       alert(`Login failed: ${getFriendlyErrorMessage(error)}`);
@@ -225,18 +255,15 @@ if (googleBtn) {
   googleBtn.addEventListener("click", async () => {
     const provider = new GoogleAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider).catch(async error => ({ user: await resolveMfaSignIn(error) }));
       console.log("Google login:", result.user);
-      alert(`Welcome, ${result.user.displayName}!`);
       // Close modal
       const authModal = document.getElementById('auth-modal');
       if (authModal) {
         authModal.classList.remove('show');
         document.body.classList.remove('auth-modal-active');
       }
-      // Set user as logged in for guard.js
-      localStorage.setItem("loggedInUser", result.user.email);
-      window.location.href = "dashboard.html";
+      await completeSignIn(result.user);
     } catch (error) {
       console.error("Google login error:", error);
       alert(`Google login failed: ${getFriendlyErrorMessage(error)}`);
@@ -249,18 +276,15 @@ if (githubBtn) {
   githubBtn.addEventListener("click", async () => {
     const provider = new GithubAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider).catch(async error => ({ user: await resolveMfaSignIn(error) }));
       console.log("GitHub login:", result.user);
-      alert(`Welcome, ${result.user.displayName || result.user.email}!`);
       // Close modal
       const authModal = document.getElementById('auth-modal');
       if (authModal) {
         authModal.classList.remove('show');
         document.body.classList.remove('auth-modal-active');
       }
-      // Set user as logged in for guard.js
-      localStorage.setItem("loggedInUser", result.user.email);
-      window.location.href = "dashboard.html";
+      await completeSignIn(result.user);
     } catch (error) {
       console.error("GitHub login error:", error);
       alert(`GitHub login failed: ${getFriendlyErrorMessage(error)}`);
