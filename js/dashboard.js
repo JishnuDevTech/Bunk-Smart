@@ -55,6 +55,8 @@ let holidayForecastData = [];
 let currentUser = null;
 let userSettings = { language: 'en', timezone: 'Asia/Kolkata', sessionTimeout: '60', autoBackup: true, backupFrequency: 'weekly' };
 let sessionTimer;
+let googleCalendarEventMap = {};
+let mfaFlow = { verificationId: null, active: false };
 
 // ─── TOAST NOTIFICATION SYSTEM ───────────────────────────────────────────────
 function showToast(message, type = 'success', duration = 3500) {
@@ -147,7 +149,14 @@ async function loadUserData() {
         renderSubjects();
         renderTimetable();
         renderHolidayForecast();
-        if (new URLSearchParams(window.location.search).get('calendar') === 'connected') syncGoogleCalendarEvents();
+        const calendarConnectedQuery = new URLSearchParams(window.location.search).get('calendar') === 'connected';
+        if (calendarConnectedQuery) {
+            localStorage.setItem('bunkSmartGoogleConnected', 'true');
+        }
+        if (localStorage.getItem('bunkSmartGoogleConnected') === 'true') {
+            applyGoogleCalendarState(true, Object.keys(googleCalendarEventMap).length || 0);
+            await syncGoogleCalendarEvents();
+        }
     } catch (error) {
         console.error('Error loading user data:', error);
         showToast('Error loading data. Please refresh.', 'error');
@@ -299,17 +308,18 @@ function applyGoogleCalendarState(connected, eventCount = 0) {
     const status = document.getElementById('google-calendar-status');
     const connectButton = document.getElementById('connect-google-calendar');
     const disconnectButton = document.getElementById('disconnect-google-calendar');
+    const isConnected = connected || localStorage.getItem('bunkSmartGoogleConnected') === 'true';
     if (status) {
-        status.textContent = connected
+        status.textContent = isConnected
             ? `${eventCount} Google Calendar event${eventCount === 1 ? '' : 's'} synced. Birthdays and calendar items can appear on the date grid.`
             : 'Optional. Read birthdays, festivals, and events after secure Google approval.';
     }
     if (connectButton) {
-        connectButton.textContent = connected ? 'Connected' : 'Connect';
-        connectButton.disabled = connected;
+        connectButton.textContent = isConnected ? 'Connected' : 'Connect';
+        connectButton.disabled = isConnected;
     }
     if (disconnectButton) {
-        disconnectButton.hidden = !connected;
+        disconnectButton.hidden = !isConnected;
     }
 }
 
@@ -321,7 +331,10 @@ async function disconnectGoogleCalendar() {
     try {
         const response = await fetch(calendarEndpoint('disconnect'), { credentials: 'include' });
         if (!response.ok) throw new Error('Disconnect failed');
+        localStorage.removeItem('bunkSmartGoogleConnected');
+        googleCalendarEventMap = {};
         applyGoogleCalendarState(false, 0);
+        renderCalendar();
         showToast('Google Calendar disconnected.', 'info');
     } catch {
         showToast('Google Calendar disconnect failed. Please try again.', 'warning');
@@ -330,6 +343,11 @@ async function disconnectGoogleCalendar() {
 
 async function syncGoogleCalendarEvents() {
     try {
+        const isConnected = localStorage.getItem('bunkSmartGoogleConnected') === 'true';
+        if (!isConnected) {
+            applyGoogleCalendarState(false, 0);
+            return;
+        }
         const response = await fetch(calendarEndpoint('events'), { credentials: 'include' });
         if (!response.ok) {
             applyGoogleCalendarState(false, 0);
@@ -337,26 +355,17 @@ async function syncGoogleCalendarEvents() {
         }
         const data = await response.json();
         const events = Array.isArray(data.events) ? data.events : [];
-        if (!events.length) {
-            applyGoogleCalendarState(true, 0);
-            return;
-        }
-        const deduped = events.filter(event => {
-            const cleanDate = String(event.date || '').slice(0, 10);
-            return cleanDate && !attendanceData[cleanDate] && !holidayForecastData.some(item => item.date === cleanDate);
-        });
-        holidayForecastData = [...holidayForecastData, ...deduped.map(event => ({ date: String(event.date).slice(0, 10), title: event.title || 'Calendar event' }))];
-        renderHolidayForecast();
-        const calendarEvents = deduped.length || events.length;
-        applyGoogleCalendarState(true, calendarEvents);
-        const status = document.getElementById('google-calendar-status');
-        if (status) status.textContent = `${calendarEvents} Google Calendar event${calendarEvents === 1 ? '' : 's'} synced. Birthdays and calendar items can appear on the date grid.`;
+        googleCalendarEventMap = {};
         events.forEach(event => {
             const cleanDate = String(event.date || '').slice(0, 10);
-            if (!cleanDate) return;
-            const cell = document.querySelector(`[data-date-key="${cleanDate}"]`);
-            if (cell) cell.classList.add('google-event');
+            if (cleanDate) {
+                googleCalendarEventMap[cleanDate] = { date: cleanDate, title: event.title || 'Calendar event' };
+            }
         });
+        const connectedCount = Object.keys(googleCalendarEventMap).length;
+        applyGoogleCalendarState(true, connectedCount);
+        renderHolidayForecast();
+        renderCalendar();
     } catch {
         applyGoogleCalendarState(false, 0);
     }
@@ -468,9 +477,17 @@ function renderCalendar() {
                     dayElement.title = att.title || 'Holiday';
                 }
             }
-            const calendarEvent = holidayForecastData.find(item => item.date === dateKey && item.title && !attendanceData[dateKey]);
-            if (calendarEvent) dayElement.classList.add('google-event');
-            if (dateKey === todayKey) dayElement.classList.add('today');
+            const calendarEvent = googleCalendarEventMap[dateKey] || holidayForecastData.find(item => item.date === dateKey && item.title && !attendanceData[dateKey]);
+            if (calendarEvent) {
+                dayElement.classList.add('google-event');
+                dayElement.title = calendarEvent.title || 'Calendar event';
+            }
+            if (dateKey === todayKey) {
+                dayElement.classList.add('today');
+                if (!dayElement.classList.contains('holiday') && !dayElement.classList.contains('bunked') && !dayElement.classList.contains('present')) {
+                    dayElement.title = 'Today';
+                }
+            }
 
             const dateCopy = new Date(currentDateIter);
             if (dateCopy <= new Date()) {
@@ -1438,7 +1455,7 @@ function setupSettings() {
     document.getElementById('college-calendar-file')?.addEventListener('change', handleCollegeCalendarUpload);
     document.getElementById('connect-google-calendar')?.addEventListener('click', connectGoogleCalendar);
     document.getElementById('disconnect-google-calendar')?.addEventListener('click', disconnectGoogleCalendar);
-    const calendarConnected = document.cookie.includes('bunk_google_tokens=');
+    const calendarConnected = localStorage.getItem('bunkSmartGoogleConnected') === 'true';
     applyGoogleCalendarState(calendarConnected, 0);
     updateNotificationStatus();
 }
@@ -1742,6 +1759,91 @@ async function saveSetting(key, value) {
     }
 }
 
+function setupMfaModal() {
+    const modal = document.getElementById('mfa-modal');
+    const toggle = document.getElementById('two-factor');
+    const phoneInput = document.getElementById('mfa-phone-number');
+    const countryInput = document.getElementById('mfa-country-code');
+    const codeRow = document.getElementById('mfa-code-row');
+    const codeInput = document.getElementById('mfa-code-input');
+    const sendButton = document.getElementById('mfa-send-code');
+    const verifyButton = document.getElementById('mfa-verify-btn');
+    const closeButton = document.getElementById('mfa-modal-close');
+    if (!modal || modal.dataset.bound === 'true') return;
+
+    modal.dataset.bound = 'true';
+
+    const resetMfaUi = () => {
+        if (phoneInput) phoneInput.value = '';
+        if (codeInput) codeInput.value = '';
+        if (codeRow) codeRow.hidden = true;
+        if (verifyButton) verifyButton.hidden = true;
+    };
+
+    const openMfaModal = () => {
+        resetMfaUi();
+        if (modal) modal.hidden = false;
+    };
+
+    const closeMfaModal = () => {
+        if (modal) modal.hidden = true;
+        if (toggle) toggle.checked = false;
+        mfaFlow = { verificationId: null, active: false };
+        resetMfaUi();
+    };
+
+    sendButton?.addEventListener('click', async () => {
+        const phone = `${countryInput?.value || '+91'}${phoneInput?.value?.trim() || ''}`;
+        if (!phone || !/^\+[1-9]\d{7,14}$/.test(phone)) {
+            showToast('Enter a valid phone number including the country code.', 'warning');
+            return;
+        }
+        try {
+            const provider = new PhoneAuthProvider(auth);
+            const session = await multiFactor(auth.currentUser).getSession();
+            mfaFlow.verificationId = await provider.verifyPhoneNumber({ phoneNumber: phone, session }, { type: 'recaptcha', size: 'invisible' });
+            mfaFlow.active = true;
+            if (codeRow) codeRow.hidden = false;
+            if (verifyButton) verifyButton.hidden = false;
+            showToast('SMS code sent. Finish verification to enable 2FA.', 'success');
+        } catch (error) {
+            console.error(error);
+            showToast(error.message || 'SMS could not be sent. Please try again.', 'warning');
+        }
+    });
+
+    verifyButton?.addEventListener('click', async () => {
+        const code = codeInput?.value?.trim();
+        if (!mfaFlow.verificationId || !code) {
+            showToast('Enter the SMS code to complete verification.', 'warning');
+            return;
+        }
+        try {
+            const credential = PhoneAuthProvider.credential(mfaFlow.verificationId, code);
+            await multiFactor(auth.currentUser).enroll(PhoneMultiFactorGenerator.assertion(credential), 'Bunk Smart phone');
+            await saveSetting('twoFactor', true);
+            if (modal) modal.hidden = true;
+            if (toggle) toggle.checked = true;
+            showToast('🔐 Two-factor authentication enabled.', 'success', 4000);
+            mfaFlow = { verificationId: null, active: false };
+        } catch (error) {
+            console.error(error);
+            if (toggle) toggle.checked = false;
+            await saveSetting('twoFactor', false);
+            showToast(error.message || 'Two-factor enrollment failed.', 'warning', 5000);
+        }
+    });
+
+    closeButton?.addEventListener('click', closeMfaModal);
+    toggle?.addEventListener('change', (event) => {
+        if (event.target.checked) {
+            openMfaModal();
+        } else {
+            closeMfaModal();
+        }
+    });
+}
+
 async function handleTwoFactorToggle(enabled) {
     const toggle = document.getElementById('two-factor');
     if (!enabled) {
@@ -1750,79 +1852,12 @@ async function handleTwoFactorToggle(enabled) {
         return;
     }
     if (!auth.currentUser) return;
-
+    setupMfaModal();
+    if (toggle) toggle.checked = true;
     const modal = document.getElementById('mfa-modal');
+    if (modal) modal.hidden = false;
     const phoneInput = document.getElementById('mfa-phone-number');
-    const countryInput = document.getElementById('mfa-country-code');
-    const sendButton = document.getElementById('mfa-send-code');
-    const verifyButton = document.getElementById('mfa-verify-btn');
-    const codeRow = document.getElementById('mfa-code-row');
-    const codeInput = document.getElementById('mfa-code-input');
-    const closeButton = document.getElementById('mfa-modal-close');
-
-    const showModal = () => {
-        if (modal) modal.hidden = false;
-        if (phoneInput) phoneInput.value = '';
-        if (codeInput) codeInput.value = '';
-        if (codeRow) codeRow.hidden = true;
-        if (verifyButton) verifyButton.hidden = true;
-    };
-
-    const hideModal = () => {
-        if (modal) modal.hidden = true;
-        if (toggle) toggle.checked = false;
-    };
-
-    showModal();
-
-    let verificationId = null;
-
-    const sendCode = async () => {
-        const phone = `${countryInput?.value || '+91'}${phoneInput?.value?.trim() || ''}`;
-        if (!phone || !/^\+[1-9]\d{7,14}$/.test(phone)) {
-            showToast('Enter a valid phone number with country code.', 'warning');
-            return;
-        }
-        try {
-            const provider = new PhoneAuthProvider(auth);
-            const session = await multiFactor(auth.currentUser).getSession();
-            verificationId = await provider.verifyPhoneNumber({ phoneNumber: phone, session }, { type: 'recaptcha', size: 'invisible' });
-            if (codeRow) codeRow.hidden = false;
-            if (verifyButton) verifyButton.hidden = false;
-            showToast('SMS code sent. Verify it to finish setup.', 'success');
-        } catch (error) {
-            console.error(error);
-            showToast(error.message || 'SMS verification could not be started.', 'warning');
-        }
-    };
-
-    const verifyCode = async () => {
-        const code = codeInput?.value?.trim();
-        if (!code || !verificationId) {
-            showToast('Enter the SMS code first.', 'warning');
-            return;
-        }
-        try {
-            const credential = PhoneAuthProvider.credential(verificationId, code);
-            await multiFactor(auth.currentUser).enroll(PhoneMultiFactorGenerator.assertion(credential), 'Bunk Smart phone');
-            await saveSetting('twoFactor', true);
-            showToast('🔐 Two-factor authentication enabled.', 'success', 4000);
-            if (modal) modal.hidden = true;
-            if (toggle) toggle.checked = true;
-        } catch (error) {
-            console.error(error);
-            if (toggle) toggle.checked = false;
-            await saveSetting('twoFactor', false);
-            showToast(error.message || 'Two-factor enrollment failed.', 'warning', 5000);
-        }
-    };
-
-    sendButton?.addEventListener('click', sendCode, { once: true });
-    verifyButton?.addEventListener('click', verifyCode, { once: true });
-    closeButton?.addEventListener('click', hideModal, { once: true });
-    if (toggle && !modal.hidden) {
-        toggle.checked = true;
-    }
+    if (phoneInput) phoneInput.focus();
 }
 
 function applyTheme(theme) {
