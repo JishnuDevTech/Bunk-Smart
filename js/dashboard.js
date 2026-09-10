@@ -46,7 +46,7 @@ const streakElement = document.getElementById('streak');
 
 // Current state
 let currentDate = new Date();
-let selectedDate = null;
+let selectedDate = new Date();
 let attendanceData = {};
 let challengesData = {};
 let subjectsData = {};
@@ -121,6 +121,7 @@ function initDashboard() {
     });
     setupNavigation();
     setupCalendar();
+    renderPlannerSidebar(selectedDate || new Date());
     setupModal();
     setupSettings();
     setupTodayCommand();
@@ -156,6 +157,7 @@ async function loadUserData() {
             timetableData = data.timetable || [];
             settings = data.settings || {};
         }
+        renderPlannerSidebar(selectedDate || new Date());
         await ensureLegalConsent(settings);
         updateStats();
         renderCalendar();
@@ -425,9 +427,70 @@ function setupCalendar() {
     renderCalendar();
 }
 
+function renderPlannerSidebar(date = new Date()) {
+    const plannerDate = document.getElementById('planner-date');
+    const plannerList = document.getElementById('planner-day-list');
+    const plannerStatus = document.getElementById('planner-status-pill');
+    const upcomingList = document.getElementById('upcoming-list');
+
+    if (!plannerDate || !plannerList || !plannerStatus || !upcomingList) return;
+
+    const dateKey = formatDate(date);
+    const record = attendanceData[dateKey];
+    const relatedEvent = googleCalendarEventMap[dateKey] || holidayForecastData.find(item => item.date === dateKey && item.title && !attendanceData[dateKey]);
+    const isFuture = date > new Date();
+
+    plannerDate.textContent = formatUserDate(date, {
+        weekday: 'long', month: 'long', day: 'numeric'
+    });
+
+    const items = [];
+    if (record) {
+        const label = record.status === 'holiday'
+            ? `Holiday • ${record.title || 'Holiday'}`
+            : record.status === 'present'
+                ? 'Present • marked attended'
+                : record.status === 'bunked'
+                    ? 'Bunked • marked absent'
+                    : 'Marked';
+        items.push({ icon: record.status === 'present' ? '✅' : record.status === 'bunked' ? '❌' : '🏖️', label });
+    }
+    if (relatedEvent) {
+        items.push({ icon: '📅', label: relatedEvent.title || 'Calendar event' });
+    }
+    if (!items.length) {
+        items.push({ icon: isFuture ? '🔒' : '•', label: isFuture ? 'Future date is locked' : 'No attendance details yet' });
+    }
+
+    plannerStatus.textContent = isFuture ? 'Locked' : record ? record.status === 'present' ? 'Present' : record.status === 'bunked' ? 'Bunked' : 'Holiday' : 'Open';
+    plannerStatus.className = `planner-pill ${isFuture ? 'locked' : record ? record.status === 'present' ? 'present' : record.status === 'bunked' ? 'bunked' : 'holiday' : 'neutral'}`;
+
+    plannerList.innerHTML = items.map(item => `<li><span>${item.icon}</span><span>${item.label}</span></li>`).join('');
+
+    const upcomingEntries = [];
+    Object.entries(googleCalendarEventMap)
+        .slice(0, 5)
+        .forEach(([key, event]) => {
+            upcomingEntries.push({ date: key, title: event.title || 'Calendar event', kind: 'calendar' });
+        });
+    holidayForecastData
+        .filter(item => item.date >= formatDate(new Date()))
+        .slice(0, 5)
+        .forEach(item => {
+            upcomingEntries.push({ date: item.date, title: item.title || 'Holiday', kind: 'holiday' });
+        });
+
+    upcomingEntries.sort((a, b) => new Date(a.date) - new Date(b.date));
+    const topUpcoming = upcomingEntries.slice(0, 5);
+    upcomingList.innerHTML = topUpcoming.length
+        ? topUpcoming.map(item => `<li><span class="upcoming-badge ${item.kind}">${item.kind === 'holiday' ? '🏖️' : '📅'}</span><div><strong>${item.title}</strong><small>${formatUserDate(new Date(item.date + 'T00:00:00'), { month: 'short', day: 'numeric' })}</small></div></li>`).join('')
+        : '<li class="empty-upcoming">No upcoming events yet</li>';
+}
+
 function renderCurrentMonth() {
     updateStats();
     renderCalendar();
+    renderPlannerSidebar(selectedDate || new Date());
     renderBunkCards();
     renderAttendanceChart();
 }
@@ -474,6 +537,7 @@ function renderCalendar() {
 
         const dateKey = formatDate(currentDateIter);
         const isCurrentMonth = currentDateIter.getMonth() === month;
+        const calendarEvent = googleCalendarEventMap[dateKey] || holidayForecastData.find(item => item.date === dateKey && item.title && !attendanceData[dateKey]);
 
         if (!isCurrentMonth) {
             dayElement.classList.add('inactive');
@@ -484,13 +548,24 @@ function renderCalendar() {
                 else if (att.status === 'bunked') dayElement.classList.add('bunked');
                 else if (att.status === 'holiday') {
                     dayElement.classList.add('holiday');
-                    dayElement.title = att.title || 'Holiday';
+                    if (!calendarEvent) dayElement.title = att.title || 'Holiday';
                 }
             }
-            const calendarEvent = googleCalendarEventMap[dateKey] || holidayForecastData.find(item => item.date === dateKey && item.title && !attendanceData[dateKey]);
             if (calendarEvent) {
                 dayElement.classList.add('google-event');
-                dayElement.title = calendarEvent.title || 'Calendar event';
+                const eventLabel = calendarEvent.title || 'Calendar event';
+                const existingTitle = dayElement.title || '';
+                dayElement.title = existingTitle ? `${existingTitle} • ${eventLabel}` : eventLabel;
+                const badge = document.createElement('span');
+                badge.className = 'day-event-badge';
+                badge.textContent = '•';
+                badge.setAttribute('aria-label', eventLabel);
+                dayElement.appendChild(badge);
+
+                const preview = document.createElement('div');
+                preview.className = 'day-hover-preview';
+                preview.textContent = eventLabel.length > 18 ? `${eventLabel.slice(0, 18)}…` : eventLabel;
+                dayElement.appendChild(preview);
             }
             if (dateKey === todayKey) {
                 dayElement.classList.add('today');
@@ -501,10 +576,23 @@ function renderCalendar() {
 
             const dateCopy = new Date(currentDateIter);
             if (dateCopy <= new Date()) {
-                dayElement.addEventListener('click', () => openAttendanceModal(dateCopy));
+                dayElement.addEventListener('click', () => {
+                    selectedDate = dateCopy;
+                    renderPlannerSidebar(dateCopy);
+                    openAttendanceModal(dateCopy);
+                });
             } else {
                 dayElement.classList.add('locked');
-                dayElement.title = 'Future dates are locked';
+                const futureHint = calendarEvent ? `${calendarEvent.title || 'Calendar event'} • future dates are read-only` : 'Future dates are locked';
+                dayElement.title = futureHint;
+                dayElement.addEventListener('click', () => {
+                    selectedDate = dateCopy;
+                    renderPlannerSidebar(dateCopy);
+                    const message = calendarEvent
+                        ? `${calendarEvent.title || 'Calendar event'} is scheduled for this date. Attendance stays locked until the day arrives.`
+                        : 'This date is in the future. Attendance stays locked until the day arrives.';
+                    showToast(message, 'info');
+                });
             }
         }
 
@@ -564,6 +652,7 @@ function openAttendanceModal(date) {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
         });
     }
+    renderPlannerSidebar(date);
 
     const dateKey = formatDate(date);
     const existing = attendanceData[dateKey];
@@ -637,6 +726,7 @@ async function saveAttendanceImmediate(status) {
     // Optimistic update
     attendanceData[dateKey] = record;
     renderCurrentMonth();
+    renderPlannerSidebar(selectedDate || new Date());
     const statusLabel = status === 'present' ? '✅ Present' : '❌ Bunked';
     showToast(`${statusLabel} marked for ${dateKey}`, status === 'present' ? 'success' : 'info');
 
@@ -664,6 +754,7 @@ async function clearAttendance() {
     closeAttendanceModal();
     delete attendanceData[dateKey];
     renderCurrentMonth();
+    renderPlannerSidebar(selectedDate || new Date());
     showToast(`↩️ ${dateKey} returned to unmarked`, 'info');
     try {
         await updateDoc(doc(db, 'users', auth.currentUser.uid), {
@@ -708,6 +799,7 @@ async function saveAttendance() {
     // Optimistic update
     attendanceData[dateKey] = record;
     closeAttendanceModal();
+    renderPlannerSidebar(selectedDate || new Date());
     renderCurrentMonth();
 
     const statusLabel = status === 'present' ? '✅ Present' : status === 'bunked' ? '❌ Bunked' : '🏖️ Holiday';
