@@ -3,11 +3,24 @@ import { auth, db } from './firebase.js';
 import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js';
 import { onAuthStateChanged, updateProfile, multiFactor, PhoneAuthProvider, PhoneMultiFactorGenerator, RecaptchaVerifier } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js';
 
-const CALENDAR_API_BASE = localStorage.getItem('bunkSmartCalendarApi') || '/.netlify/functions';
+const resolveCalendarApiBase = () => {
+    const hostname = window.location.hostname;
+    const port = window.location.port;
+    const isNetlifyLocal = hostname === 'localhost' && port === '8888';
+    const isNetlifyHost = hostname.includes('netlify.app') || isNetlifyLocal;
+    const isVercelHost = hostname.includes('vercel.app') || hostname.includes('github.dev') || hostname.includes('app.github.dev');
+
+    if (isNetlifyHost) return '/.netlify/functions';
+    if (isVercelHost) return '/api/google';
+
+    const configuredBase = localStorage.getItem('bunkSmartCalendarApi');
+    if (configuredBase) return configuredBase.replace(/\/$/, '');
+    return '/api/google';
+};
+
+const CALENDAR_API_BASE = resolveCalendarApiBase();
 const LEGAL_VERSION = '2026-09-10-v1';
-const calendarEndpoint = action => CALENDAR_API_BASE.includes('/.netlify/functions')
-    ? `${CALENDAR_API_BASE}/google-${action}`
-    : `${CALENDAR_API_BASE}/api/google/${action}`;
+const calendarEndpoint = action => `${CALENDAR_API_BASE}/${action}`;
 
 // DOM Elements
 const userNameElement = document.getElementById('user-name');
