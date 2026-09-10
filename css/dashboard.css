@@ -316,6 +316,18 @@ body.theme-dark .forecast-strip { background: rgba(120, 53, 15, 0.18); }
   border-radius: var(--radius);
   background: linear-gradient(120deg, #eff6ff 0%, #f0fdf4 100%);
 }
+
+.calendar-connect-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.btn-danger {
+  border-color: rgba(220, 38, 38, 0.35) !important;
+  color: #991b1b !important;
+  background: rgba(254, 226, 226, 0.9) !important;
+}
 .today-copy h2 { margin: 0.15rem 0 0.25rem; font-size: 1.35rem; color: #0f172a; }
 .today-copy p { margin: 0; color: #475569; font-size: 0.85rem; }
 .eyebrow { color: var(--primary); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; }
@@ -590,6 +602,23 @@ body.theme-dark .forecast-strip { background: rgba(120, 53, 15, 0.18); }
   box-shadow: 0 0 0 2px rgba(245,158,11,0.3);
 }
 
+.day-cell.today:not(.holiday):not(.bunked):not(.present) {
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  color: #0f172a;
+}
+
+.day-cell.google-event::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #60a5fa;
+  right: 7px;
+  bottom: 7px;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25);
+}
+
 /* ─── MODAL ──────────────────────────────────────── */
 .modal {
   position: fixed; inset: 0;
@@ -609,6 +638,50 @@ body.theme-dark .forecast-strip { background: rgba(120, 53, 15, 0.18); }
   position: relative;
   border: 1px solid var(--border);
   animation: slideInUp 0.3s ease-out;
+}
+
+.mfa-modal-content {
+  max-width: 430px;
+}
+
+.mfa-form {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.mfa-input-row {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mfa-input-row label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.mfa-input-row input,
+.mfa-input-row select {
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.02);
+  color: var(--text);
+}
+
+.mfa-primary-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 0.8rem 1rem;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.24);
 }
 
 .modal-close {

@@ -14,6 +14,7 @@ venv/
 node_modules/
 npm-debug.log*
 .netlify/
+netlify/functions/*.zip
 
 # OS and editor files
 .DS_Store

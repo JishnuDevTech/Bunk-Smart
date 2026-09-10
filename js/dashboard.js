@@ -282,28 +282,83 @@ function renderHolidayForecast() {
     const container = document.getElementById('holiday-forecast');
     if (!container) return;
     const today = new Date();
-    const recorded = Object.entries(attendanceData).filter(([key, record]) => record.status === 'holiday' && new Date(`${key}T00:00:00`) > today).map(([date, record]) => ({ date, title: record.title || 'Holiday' }));
-    const upcoming = [...recorded, ...holidayForecastData.filter(item => !attendanceData[item.date])].sort((a, b) => a.date.localeCompare(b)).slice(0, 4);
+    const recorded = Object.entries(attendanceData)
+        .filter(([key, record]) => record.status === 'holiday' && new Date(`${key}T00:00:00`) > today)
+        .map(([date, record]) => ({ date, title: record.title || 'Holiday' }));
+    const manualOnly = [...recorded].sort((a, b) => a.date.localeCompare(b));
+    const imported = holidayForecastData
+        .filter(item => item.date && !attendanceData[item.date])
+        .filter(item => !manualOnly.some(existing => existing.date === item.date));
+    const upcoming = [...manualOnly, ...imported].sort((a, b) => a.date.localeCompare(b)).slice(0, 3);
     if (!upcoming.length) { container.hidden = true; return; }
     container.hidden = false;
-    container.innerHTML = `<span class="forecast-label">UPCOMING</span>${upcoming.map(item => `<span class="forecast-item"><b>${formatUserDate(new Date(`${item.date}T00:00:00`), { month: 'short', day: 'numeric' })}</b>${item.title}<small>Locked until date</small></span>`).join('')}`;
+    container.innerHTML = `<span class="forecast-label">UPCOMING</span>${upcoming.map(item => `<span class="forecast-item"><b>${formatUserDate(new Date(`${item.date}T00:00:00`), { month: 'short', day: 'numeric' })}</b>${item.title}<small>Marked by you</small></span>`).join('')}`;
+}
+
+function applyGoogleCalendarState(connected, eventCount = 0) {
+    const status = document.getElementById('google-calendar-status');
+    const connectButton = document.getElementById('connect-google-calendar');
+    const disconnectButton = document.getElementById('disconnect-google-calendar');
+    if (status) {
+        status.textContent = connected
+            ? `${eventCount} Google Calendar event${eventCount === 1 ? '' : 's'} synced. Birthdays and calendar items can appear on the date grid.`
+            : 'Optional. Read birthdays, festivals, and events after secure Google approval.';
+    }
+    if (connectButton) {
+        connectButton.textContent = connected ? 'Connected' : 'Connect';
+        connectButton.disabled = connected;
+    }
+    if (disconnectButton) {
+        disconnectButton.hidden = !connected;
+    }
 }
 
 function connectGoogleCalendar() {
     window.location.href = calendarEndpoint('login');
 }
 
+async function disconnectGoogleCalendar() {
+    try {
+        const response = await fetch(calendarEndpoint('disconnect'), { credentials: 'include' });
+        if (!response.ok) throw new Error('Disconnect failed');
+        applyGoogleCalendarState(false, 0);
+        showToast('Google Calendar disconnected.', 'info');
+    } catch {
+        showToast('Google Calendar disconnect failed. Please try again.', 'warning');
+    }
+}
+
 async function syncGoogleCalendarEvents() {
     try {
         const response = await fetch(calendarEndpoint('events'), { credentials: 'include' });
-        if (!response.ok) return;
+        if (!response.ok) {
+            applyGoogleCalendarState(false, 0);
+            return;
+        }
         const data = await response.json();
-        holidayForecastData = [...holidayForecastData, ...(data.events || []).filter(event => !holidayForecastData.some(item => item.date === event.date))];
+        const events = Array.isArray(data.events) ? data.events : [];
+        if (!events.length) {
+            applyGoogleCalendarState(true, 0);
+            return;
+        }
+        const deduped = events.filter(event => {
+            const cleanDate = String(event.date || '').slice(0, 10);
+            return cleanDate && !attendanceData[cleanDate] && !holidayForecastData.some(item => item.date === cleanDate);
+        });
+        holidayForecastData = [...holidayForecastData, ...deduped.map(event => ({ date: String(event.date).slice(0, 10), title: event.title || 'Calendar event' }))];
         renderHolidayForecast();
+        const calendarEvents = deduped.length || events.length;
+        applyGoogleCalendarState(true, calendarEvents);
         const status = document.getElementById('google-calendar-status');
-        if (status) status.textContent = `${data.events?.length || 0} Google Calendar events synced. Recommendations remain optional.`;
+        if (status) status.textContent = `${calendarEvents} Google Calendar event${calendarEvents === 1 ? '' : 's'} synced. Birthdays and calendar items can appear on the date grid.`;
+        events.forEach(event => {
+            const cleanDate = String(event.date || '').slice(0, 10);
+            if (!cleanDate) return;
+            const cell = document.querySelector(`[data-date-key="${cleanDate}"]`);
+            if (cell) cell.classList.add('google-event');
+        });
     } catch {
-        // Calendar connection is optional and should never block attendance.
+        applyGoogleCalendarState(false, 0);
     }
 }
 
@@ -395,6 +450,7 @@ function renderCalendar() {
     while (currentDateIter <= lastDay || dayCount < 42) {
         const dayElement = document.createElement('div');
         dayElement.className = 'day-cell';
+        dayElement.dataset.dateKey = formatDate(currentDateIter);
         dayElement.textContent = currentDateIter.getDate();
 
         const dateKey = formatDate(currentDateIter);
@@ -412,6 +468,8 @@ function renderCalendar() {
                     dayElement.title = att.title || 'Holiday';
                 }
             }
+            const calendarEvent = holidayForecastData.find(item => item.date === dateKey && item.title && !attendanceData[dateKey]);
+            if (calendarEvent) dayElement.classList.add('google-event');
             if (dateKey === todayKey) dayElement.classList.add('today');
 
             const dateCopy = new Date(currentDateIter);
@@ -1379,6 +1437,9 @@ function setupSettings() {
     document.getElementById('detect-location')?.addEventListener('click', detectLocation);
     document.getElementById('college-calendar-file')?.addEventListener('change', handleCollegeCalendarUpload);
     document.getElementById('connect-google-calendar')?.addEventListener('click', connectGoogleCalendar);
+    document.getElementById('disconnect-google-calendar')?.addEventListener('click', disconnectGoogleCalendar);
+    const calendarConnected = document.cookie.includes('bunk_google_tokens=');
+    applyGoogleCalendarState(calendarConnected, 0);
     updateNotificationStatus();
 }
 
@@ -1684,42 +1745,83 @@ async function saveSetting(key, value) {
 async function handleTwoFactorToggle(enabled) {
     const toggle = document.getElementById('two-factor');
     if (!enabled) {
-        if (auth.currentUser?.multiFactor?.enrolledFactors?.length) {
-            showToast('Remove the enrolled factor from your Firebase account security flow.', 'info', 3500);
-            if (toggle) toggle.checked = true;
-            return;
-        }
         await saveSetting('twoFactor', false);
         showToast('Two-factor preference disabled.', 'info', 2000);
         return;
     }
     if (!auth.currentUser) return;
-    const phoneNumber = window.prompt('Enter your phone number with country code, for example +919876543210');
-    if (!phoneNumber) { if (toggle) toggle.checked = false; return; }
-    const container = document.getElementById('mfa-recaptcha');
-    if (container) container.hidden = false;
-    let verifier;
-    try {
-        verifier = new RecaptchaVerifier(auth, 'mfa-recaptcha', { size: 'normal' });
-        const session = await multiFactor(auth.currentUser).getSession();
-        const provider = new PhoneAuthProvider(auth);
-        const verificationId = await provider.verifyPhoneNumber({ phoneNumber, session }, verifier);
-        const code = window.prompt('Enter the SMS verification code');
-        if (!code) throw new Error('Verification cancelled');
-        const credential = PhoneAuthProvider.credential(verificationId, code);
-        await multiFactor(auth.currentUser).enroll(PhoneMultiFactorGenerator.assertion(credential), 'Bunk Smart phone');
-        await saveSetting('twoFactor', true);
-        showToast('🔐 Two-factor authentication enabled.', 'success', 4000);
-    } catch (error) {
+
+    const modal = document.getElementById('mfa-modal');
+    const phoneInput = document.getElementById('mfa-phone-number');
+    const countryInput = document.getElementById('mfa-country-code');
+    const sendButton = document.getElementById('mfa-send-code');
+    const verifyButton = document.getElementById('mfa-verify-btn');
+    const codeRow = document.getElementById('mfa-code-row');
+    const codeInput = document.getElementById('mfa-code-input');
+    const closeButton = document.getElementById('mfa-modal-close');
+
+    const showModal = () => {
+        if (modal) modal.hidden = false;
+        if (phoneInput) phoneInput.value = '';
+        if (codeInput) codeInput.value = '';
+        if (codeRow) codeRow.hidden = true;
+        if (verifyButton) verifyButton.hidden = true;
+    };
+
+    const hideModal = () => {
+        if (modal) modal.hidden = true;
         if (toggle) toggle.checked = false;
-        await saveSetting('twoFactor', false);
-        const message = error.code === 'auth/requires-recent-login'
-            ? 'Please sign out and sign in again before enabling two-factor authentication.'
-            : error.message || 'Two-factor enrollment failed.';
-        showToast(message, 'warning', 5000);
-    } finally {
-        verifier?.clear();
-        if (container) container.hidden = true;
+    };
+
+    showModal();
+
+    let verificationId = null;
+
+    const sendCode = async () => {
+        const phone = `${countryInput?.value || '+91'}${phoneInput?.value?.trim() || ''}`;
+        if (!phone || !/^\+[1-9]\d{7,14}$/.test(phone)) {
+            showToast('Enter a valid phone number with country code.', 'warning');
+            return;
+        }
+        try {
+            const provider = new PhoneAuthProvider(auth);
+            const session = await multiFactor(auth.currentUser).getSession();
+            verificationId = await provider.verifyPhoneNumber({ phoneNumber: phone, session }, { type: 'recaptcha', size: 'invisible' });
+            if (codeRow) codeRow.hidden = false;
+            if (verifyButton) verifyButton.hidden = false;
+            showToast('SMS code sent. Verify it to finish setup.', 'success');
+        } catch (error) {
+            console.error(error);
+            showToast(error.message || 'SMS verification could not be started.', 'warning');
+        }
+    };
+
+    const verifyCode = async () => {
+        const code = codeInput?.value?.trim();
+        if (!code || !verificationId) {
+            showToast('Enter the SMS code first.', 'warning');
+            return;
+        }
+        try {
+            const credential = PhoneAuthProvider.credential(verificationId, code);
+            await multiFactor(auth.currentUser).enroll(PhoneMultiFactorGenerator.assertion(credential), 'Bunk Smart phone');
+            await saveSetting('twoFactor', true);
+            showToast('🔐 Two-factor authentication enabled.', 'success', 4000);
+            if (modal) modal.hidden = true;
+            if (toggle) toggle.checked = true;
+        } catch (error) {
+            console.error(error);
+            if (toggle) toggle.checked = false;
+            await saveSetting('twoFactor', false);
+            showToast(error.message || 'Two-factor enrollment failed.', 'warning', 5000);
+        }
+    };
+
+    sendButton?.addEventListener('click', sendCode, { once: true });
+    verifyButton?.addEventListener('click', verifyCode, { once: true });
+    closeButton?.addEventListener('click', hideModal, { once: true });
+    if (toggle && !modal.hidden) {
+        toggle.checked = true;
     }
 }
 

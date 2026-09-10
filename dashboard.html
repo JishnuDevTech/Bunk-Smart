@@ -713,7 +713,10 @@
                 <label>Google Calendar</label>
                 <span class="setting-hint" id="google-calendar-status">Optional. Read birthdays, festivals, and events after secure Google approval.</span>
               </div>
-              <button id="connect-google-calendar" class="btn-save-inline" type="button">Connect</button>
+              <div class="calendar-connect-actions">
+                <button id="connect-google-calendar" class="btn-save-inline" type="button">Connect</button>
+                <button id="disconnect-google-calendar" class="btn-save-inline btn-danger" type="button" hidden>Disconnect</button>
+              </div>
             </div>
             <div class="setting-item toggle-setting">
               <div class="setting-info">
@@ -910,6 +913,50 @@
 
       <button id="clear-attendance" class="btn-clear-attendance" type="button">Clear this date</button>
       <button id="save-attendance" class="btn-primary">Save Attendance</button>
+    </div>
+  </div>
+
+  <!-- MFA MODAL -->
+  <div class="modal" id="mfa-modal" hidden>
+    <div class="modal-content mfa-modal-content">
+      <button class="modal-close" id="mfa-modal-close">&times;</button>
+      <div class="custom-modal-header">
+        <span class="custom-modal-icon">🔐</span>
+        <div>
+          <h3>Secure your account</h3>
+          <p>Use your phone for a premium 2-step verification setup.</p>
+        </div>
+      </div>
+
+      <div class="mfa-form">
+        <div class="mfa-input-row">
+          <label for="mfa-country-code">Country</label>
+          <select id="mfa-country-code">
+            <option value="+1">+1</option>
+            <option value="+44">+44</option>
+            <option value="+91" selected>+91</option>
+            <option value="+61">+61</option>
+            <option value="+971">+971</option>
+            <option value="+852">+852</option>
+            <option value="+65">+65</option>
+            <option value="+971">+971</option>
+          </select>
+        </div>
+
+        <div class="mfa-input-row">
+          <label for="mfa-phone-number">Phone</label>
+          <input type="tel" id="mfa-phone-number" placeholder="9876543210" inputmode="tel" />
+        </div>
+
+        <button class="mfa-primary-btn" id="mfa-send-code">Send SMS code</button>
+
+        <div class="mfa-input-row" id="mfa-code-row" hidden>
+          <label for="mfa-code-input">Code</label>
+          <input type="text" id="mfa-code-input" placeholder="123456" inputmode="numeric" />
+        </div>
+
+        <button class="mfa-primary-btn" id="mfa-verify-btn" hidden>Verify & enable</button>
+      </div>
     </div>
   </div>
 
