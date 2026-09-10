@@ -232,6 +232,50 @@ function renderTodayCommand() {
     if (dateElement) dateElement.textContent = formatUserDate(date, { weekday: 'long', month: 'long', day: 'numeric' });
     if (statusElement) statusElement.textContent = record ? `${record.status === 'holiday' ? 'Holiday: ' + record.title : record.status[0].toUpperCase() + record.status.slice(1)} recorded.` : 'Your attendance status is unmarked.';
     document.querySelectorAll('.today-actions button').forEach(button => { button.disabled = false; });
+    renderDailyFocus();
+}
+
+function renderDailyFocus() {
+    const container = document.getElementById('daily-focus');
+    if (!container) return;
+
+    const todayKeyValue = todayKey();
+    const record = attendanceData[todayKeyValue];
+    const currentMonth = new Date().getMonth();
+    const workingDays = Object.keys(attendanceData).filter(dateKey => {
+        const d = new Date(`${dateKey}T00:00:00`);
+        return d.getMonth() === currentMonth;
+    }).length;
+
+    const tasks = [];
+    if (!record) {
+        tasks.push({ icon: '✅', text: 'Mark today’s attendance before the day ends.' });
+    } else {
+        tasks.push({ icon: record.status === 'holiday' ? '🎉' : record.status === 'present' ? '✅' : '⚠️', text: record.status === 'holiday' ? `Holiday saved: ${record.title || 'Special day'}` : `${record.status === 'present' ? 'Present' : 'Bunked'} recorded for today.` });
+    }
+
+    const target = Math.min(100, Math.max(1, Number(document.getElementById('smart-target')?.value || 75)));
+    const monthStats = getMonthMetrics(new Date().getFullYear(), new Date().getMonth());
+    const projected = monthStats.totalCount ? Math.round((monthStats.presentCount / monthStats.totalCount) * 100) : 0;
+    tasks.push({ icon: '📈', text: `Current momentum: ${projected}% attendance this month. Target: ${target}%` });
+
+    const nextUnmarked = Object.keys(attendanceData).find(dateKey => {
+        const date = new Date(`${dateKey}T00:00:00`);
+        return date > new Date() && isWorkingDay(date) && !attendanceData[dateKey];
+    });
+
+    if (nextUnmarked) {
+        tasks.push({ icon: '🗓️', text: `Upcoming working day: ${formatUserDate(new Date(`${nextUnmarked}T00:00:00`), { month: 'short', day: 'numeric' })}` });
+    } else {
+        tasks.push({ icon: '💡', text: 'Your planner is clear for the upcoming working days.' });
+    }
+
+    container.innerHTML = tasks.map(item => `
+        <div class="focus-item">
+          <span class="focus-icon">${item.icon}</span>
+          <span>${item.text}</span>
+        </div>
+    `).join('');
 }
 
 async function markToday(status, title = '') {

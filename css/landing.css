@@ -358,9 +358,19 @@ select {
 
 .features,
 .about,
+.work-section,
+.testimonial-section,
+.faq-section,
 .cta-section,
 .footer {
   position: relative;
+}
+
+.features,
+.work-section,
+.testimonial-section,
+.faq-section {
+  padding: 6.25rem 0;
 }
 
 .features {
@@ -369,7 +379,10 @@ select {
 }
 
 .features h2,
-.about h2 {
+.about h2,
+.work-section h2,
+.testimonial-section h2,
+.faq-section h2 {
   text-align: center;
   font-size: clamp(2rem, 4vw, 3rem);
   line-height: 1.15;
@@ -378,15 +391,29 @@ select {
   color: var(--text);
 }
 
+.section-kicker {
+  text-align: center;
+  margin-bottom: 0.9rem;
+  font-size: 0.76rem;
+  letter-spacing: 0.16em;
+  color: var(--primary);
+  font-weight: 800;
+}
+
 .features-grid,
-.about-grid {
+.about-grid,
+.testimonial-grid,
+.how-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
   gap: clamp(1.25rem, 3vw, 2rem);
 }
 
 .feature-card,
-.about-card {
+.about-card,
+.step-card,
+.testimonial-card,
+.faq-item {
   position: relative;
   padding: clamp(1.6rem, 3vw, 2.3rem);
   background: rgba(255, 255, 255, 0.82);
@@ -398,7 +425,10 @@ select {
 }
 
 .feature-card::before,
-.about-card::before {
+.about-card::before,
+.step-card::before,
+.testimonial-card::before,
+.faq-item::before {
   content: '';
   position: absolute;
   inset: 0 auto auto 0;
@@ -409,7 +439,10 @@ select {
 }
 
 .feature-card:hover,
-.about-card:hover {
+.about-card:hover,
+.step-card:hover,
+.testimonial-card:hover,
+.faq-item:hover {
   transform: translateY(-4px);
   box-shadow: 0 24px 42px rgba(15, 23, 42, 0.08);
   border-color: rgba(37, 99, 235, 0.2);
